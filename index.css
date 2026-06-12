@@ -395,6 +395,26 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
   visibility: visible;
 }
 
+.footer-links {
+  text-align: center;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  font-size: 12px;
+  color: #5e665d;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: #1f6f4a;
+  text-decoration: underline;
+}
+
 @keyframes modalDialogIn {
   from {
     opacity: 0;
