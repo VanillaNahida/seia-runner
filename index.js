@@ -20,6 +20,7 @@
   var maxJumpHold = 0.18;
   var fastDropGravity = 3900;
   var bestScore = Number(localStorage.getItem("seia-runner-best") || 0);
+  var csrfToken = "";
   var lastTime = 0;
   var spawnTimer = 0;
   var state = "ready";
@@ -140,6 +141,7 @@
     playBgm();
     resetGame();
     state = "playing";
+    fetchCsrfToken();
     overlay.classList.add("hidden");
     requestAnimationFrame(loop);
   }
@@ -799,6 +801,17 @@
     return "Unknown";
   }
 
+  function fetchCsrfToken() {
+    fetch("api/get_scores.php?type=all&page=1&pageSize=1")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.csrf_token) {
+          csrfToken = data.csrf_token;
+        }
+      })
+      .catch(function () {});
+  }
+
   function openSubmitModal() {
     if (isCheatModalOpen()) return;
 
@@ -875,7 +888,7 @@
     formData.append("nickname", nickname);
     formData.append("message", message);
     formData.append("score", String(game.score));
-    formData.append("ip_addr", ipInfo ? ipInfo.data.addr || "" : "");
+    formData.append("csrf_token", csrfToken || "");
     formData.append("device", getUserDevice());
     formData.append("fingerprint", getUserFingerprint());
 
