@@ -44,6 +44,12 @@ if ($fingerprint === "") {
     exit;
 }
 
+// 设备校验
+if ($device === "") {
+    echo json_encode(["code" => 400, "message" => "设备信息获取失败，请刷新页面重试"]);
+    exit;
+}
+
 // 敏感词检测
 $badWord = checkSensitiveWords($nickname);
 if ($badWord !== false) {
@@ -61,11 +67,11 @@ if ($message !== "") {
 
 $conn = getDB();
 
-// 查询是否已存在同指纹+同IP的记录
+// 查询是否已存在同指纹+同设备的记录
 $stmt = $conn->prepare(
-    "SELECT id, score FROM seia_score_rank WHERE fingerprint = ? AND ip_addr = ? LIMIT 1"
+    "SELECT id, score FROM seia_score_rank WHERE fingerprint = ? AND device = ? LIMIT 1"
 );
-$stmt->bind_param("ss", $fingerprint, $ip_addr);
+$stmt->bind_param("ss", $fingerprint, $device);
 $stmt->execute();
 $existing = $stmt->get_result()->fetch_assoc();
 $stmt->close();

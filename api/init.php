@@ -28,14 +28,15 @@ function getDB() {
         fingerprint VARCHAR(128) NOT NULL DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uk_fingerprint_ip (fingerprint, ip_addr)
+        UNIQUE KEY uk_fingerprint_device (fingerprint, device)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
     $conn->query($sql);
 
-    // 旧表兼容: 尝试添加缺失的列
+    // 旧表兼容: 尝试添加缺失的列，升级唯一键为 fingerprint+device
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN fingerprint VARCHAR(128) NOT NULL DEFAULT '' AFTER location"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"); } catch (Exception $e) {}
-    try { $conn->query("ALTER TABLE seia_score_rank ADD UNIQUE uk_fingerprint_ip (fingerprint, ip_addr)"); } catch (Exception $e) {}
+    try { $conn->query("ALTER TABLE seia_score_rank DROP INDEX uk_fingerprint_ip"); } catch (Exception $e) {}
+    try { $conn->query("ALTER TABLE seia_score_rank ADD UNIQUE uk_fingerprint_device (fingerprint, device)"); } catch (Exception $e) {}
 
     return $conn;
 }
