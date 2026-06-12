@@ -64,7 +64,6 @@ body {
   color: #1b2f25;
   display: flex;
   flex-wrap: wrap;
-  font-family: "Courier New", monospace;
   font-size: 18px;
   font-weight: 700;
   gap: 14px;
@@ -147,7 +146,7 @@ button {
   border-radius: 6px;
   color: #ffffff;
   cursor: pointer;
-  font: 700 18px/1 Arial, "Microsoft YaHei", sans-serif;
+  font: 700 18px/1 "Blueaka", Arial, sans-serif;
   min-height: 44px;
   min-width: 112px;
   padding: 0 22px;
@@ -281,7 +280,7 @@ button:active {
   color: #ffffff;
   cursor: pointer;
   display: inline-block;
-  font: 700 16px/1 Arial, "Microsoft YaHei", sans-serif;
+  font: 700 16px/1 "Blueaka", Arial, sans-serif;
   min-width: 52px;
   padding: 6px 10px;
   text-align: center;
