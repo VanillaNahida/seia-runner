@@ -112,7 +112,7 @@ seia-runner/
 - [zhaoyj7](https://github.com/zhaoyj7)：提供IP地址查询和技术支持
 - [zoujingli](https://github.com/zoujingli/ip2region)：IP地址归属地查询API支持
 - [lionsoul2014](https://github.com/lionsoul2014/ip2region)：IP地址归属地查询数据库支持
-
+- [ottomate](https://ottomate.games/zxf/)：原作
 # Bug 反馈
 
 如果在使用过程中遇到任何问题，请通过以下方式反馈：
