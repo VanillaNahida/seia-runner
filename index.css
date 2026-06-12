@@ -206,16 +206,27 @@ button:active {
 
 .cheat-modal {
   align-items: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0);
   display: flex;
   inset: 0;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
   position: fixed;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  visibility: hidden;
   z-index: 20;
 }
 
-.cheat-modal.hidden {
-  display: none;
+.cheat-modal:not(.hidden) {
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.cheat-modal:not(.hidden) .cheat-dialog {
+  animation: modalDialogIn 0.25s ease;
 }
 
 .cheat-dialog {
@@ -289,16 +300,27 @@ button:active {
 
 .submit-modal {
   align-items: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0);
   display: flex;
   inset: 0;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
   position: fixed;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  visibility: hidden;
   z-index: 25;
 }
 
-.submit-modal.hidden {
-  display: none;
+.submit-modal:not(.hidden) {
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.submit-modal:not(.hidden) .submit-dialog {
+  animation: modalDialogIn 0.25s ease;
 }
 
 .submit-dialog {
@@ -346,7 +368,6 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
 
 .toast {
   align-items: center;
-  animation: toastIn 0.3s ease;
   background: #1b2f25;
   border-radius: 8px;
   color: #ffffff;
@@ -356,25 +377,32 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
   left: 50%;
   line-height: 1.5;
   max-width: 420px;
+  opacity: 0;
   padding: 14px 24px;
+  pointer-events: none;
   position: fixed;
   text-align: center;
   top: 24px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  visibility: hidden;
   z-index: 30;
 }
 
-.toast.hidden {
-  display: none;
+.toast:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+  visibility: visible;
 }
 
-@keyframes toastIn {
+@keyframes modalDialogIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-12px);
+    transform: scale(0.92) translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: scale(1) translateY(0);
   }
 }

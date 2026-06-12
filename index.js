@@ -30,6 +30,20 @@
   var bgm = new Audio("assets/music/bgm_Peaceful_Day.mp3");
   bgm.loop = true;
   bgm.volume = 0.5;
+
+  // 页面隐藏时暂停音乐，返回时恢复
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      bgm.pause();
+    } else if (state === "playing") {
+      bgm.play().catch(function () {});
+    }
+  });
+
+  // 页面即将离开时暂停音乐
+  window.addEventListener("pagehide", function () {
+    bgm.pause();
+  });
   var deathSound = new Audio("assets/audio/seia-death.wav");
   deathSound.volume = 0.9;
   var cheatSound = new Audio("assets/audio/0d000721.mp3");
