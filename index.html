@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!-- saved from url=(0027)https://ottomate.games/zxf/ -->
+<html lang="zh-CN"><div id="__caoliao-browser-ext-root"></div><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>圣娅快跑</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka/Blueaka.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka_Bold/Blueaka_Bold.css">
+  <link rel="stylesheet" href="./index.css">
+  <script defer="" src="./index.js"></script>
+</head>
+<body>
+  <div class="page-shell">
+    <main class="game-shell" aria-label="圣娅快跑">
+      <div class="hud" aria-live="polite">
+        <div>
+          <strong>圣娅快跑</strong>
+          <span>长按跳更高，按↓蹲下躲雪碧</span>
+        </div>
+        <div class="scoreboard">
+          <span id="score">SCORE: 00000</span>
+          <span id="best">HI: 00721</span>
+        </div>
+        <a id="rankBtn" class="rank-btn" href="leaderboard.html" title="排行榜">排行</a>
+      </div>
+
+      <canvas id="game" width="960" height="360"></canvas>
+
+      <div id="overlay" class="overlay">
+        <h1>圣娅快跑</h1>
+        <p id="overlayText">圣娅：你跑不过我你信吗！按空格 / ↑ 或跳跃按钮起跳，长按跳得更高；按 ↓ 或下蹲按钮躲过雪碧。</p>
+        <div class="overlay-buttons">
+          <button id="startButton" type="button">开始</button>
+          <button id="uploadScoreBtn" class="hidden" type="button">上传成绩</button>
+        </div>
+      </div>
+
+      <div id="cheatModal" class="cheat-modal hidden">
+        <div class="cheat-dialog">
+          <h2>请输入神秘代码</h2>
+          <input id="cheatInput" type="text" maxlength="20" placeholder="输入代码..." autocomplete="off">
+          <p id="cheatError" class="cheat-error hidden">神秘代码无效！</p>
+          <div class="cheat-buttons">
+            <button id="cheatSubmit" type="button">确认</button>
+            <button id="cheatCancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+      <div id="submitModal" class="submit-modal hidden">
+        <div class="submit-dialog">
+          <h2>上传成绩</h2>
+          <p class="submit-score">你的成绩: <strong id="submitScoreVal">0</strong></p>
+          <input id="submitNickname" type="text" maxlength="10" placeholder="昵称（最多10个字）" autocomplete="off">
+          <input id="submitMessage" type="text" maxlength="30" placeholder="留言（最多30个字，可选）" autocomplete="off">
+          <p id="submitError" class="cheat-error hidden"></p>
+          <div class="cheat-buttons">
+            <button id="submitConfirm" type="button">提交</button>
+            <button id="submitCancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+      <div id="toast" class="toast hidden"></div>
+    </main>
+
+    <div class="mobile-controls" aria-label="移动端控制">
+      <button id="jumpButton" class="control-button jump-button" type="button">跳跃</button>
+      <button id="duckButton" class="control-button duck-button" type="button">下蹲</button>
+    </div>
+  </div>

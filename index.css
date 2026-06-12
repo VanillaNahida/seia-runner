@@ -1,0 +1,386 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  align-items: center;
+  background: #f4f6f1;
+  color: #18201c;
+  display: flex;
+  font-family: "Blueaka", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-weight: 400;
+  justify-content: center;
+  margin: 0;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.page-shell {
+  max-width: 960px;
+  width: min(960px, calc(100vw - 24px));
+}
+
+.game-shell {
+  background: #fffdf6;
+  border: 2px solid #28342d;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(32, 42, 35, 0.16);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.hud {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 2px solid #28342d;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 10px 16px;
+}
+
+.hud strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.hud span {
+  color: #5e665d;
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.scoreboard {
+  color: #1b2f25;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: "Courier New", monospace;
+  font-size: 18px;
+  font-weight: 700;
+  gap: 14px;
+  justify-content: flex-end;
+  min-width: 170px;
+  text-align: right;
+}
+
+canvas {
+  aspect-ratio: 8 / 3;
+  background: #f7fbff;
+  display: block;
+  height: auto;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.mobile-controls {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+  touch-action: none;
+  user-select: none;
+}
+
+.control-button {
+  border-radius: 8px;
+  font-size: 20px;
+  min-height: 58px;
+  min-width: 0;
+  padding: 0 12px;
+  touch-action: none;
+  width: 100%;
+}
+
+.jump-button {
+  background: #1f6f4a;
+}
+
+.duck-button {
+  background: #45534a;
+}
+
+.overlay {
+  align-items: center;
+  background: rgba(255, 253, 246, 0.88);
+  display: flex;
+  flex-direction: column;
+  inset: 56px 0 0;
+  justify-content: center;
+  padding: 24px;
+  position: absolute;
+  text-align: center;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h1 {
+  font-size: clamp(30px, 7vw, 64px);
+  letter-spacing: 0;
+  line-height: 1;
+  margin: 0 0 12px;
+}
+
+.overlay p {
+  color: #4d554d;
+  font-size: clamp(14px, 2.5vw, 18px);
+  line-height: 1.6;
+  margin: 0 0 18px;
+  max-width: 520px;
+}
+
+button {
+  background: #1f6f4a;
+  border: 2px solid #163826;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font: 700 18px/1 Arial, "Microsoft YaHei", sans-serif;
+  min-height: 44px;
+  min-width: 112px;
+  padding: 0 22px;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 560px) {
+  body {
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+
+  .hud {
+    align-items: flex-start;
+    min-height: 72px;
+    padding: 9px 10px;
+  }
+
+  .hud strong {
+    font-size: 16px;
+  }
+
+  .hud span {
+    font-size: 12px;
+  }
+
+  .scoreboard {
+    font-size: 15px;
+    gap: 6px;
+    min-width: 112px;
+  }
+
+  .overlay {
+    inset: 72px 0 0;
+  }
+
+  .page-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 10px);
+  }
+
+  .game-shell {
+    flex-shrink: 0;
+  }
+
+  .mobile-controls {
+    flex: 1;
+    align-content: center;
+    gap: 14px;
+    padding: 4px 10px 20px;
+  }
+
+  .control-button {
+    font-size: 28px;
+    min-height: 110px;
+  }
+}
+
+.cheat-modal {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 20;
+}
+
+.cheat-modal.hidden {
+  display: none;
+}
+
+.cheat-dialog {
+  background: #fffdf6;
+  border: 2px solid #28342d;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  width: 320px;
+}
+
+.cheat-dialog h2 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+
+.cheat-dialog input {
+  border: 2px solid #28342d;
+  border-radius: 4px;
+  font-size: 18px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  text-align: center;
+  width: 100%;
+}
+
+.cheat-error {
+  color: #c0392b;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.cheat-error.hidden {
+  display: none;
+}
+
+.cheat-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+#cheatCancel {
+  background: #8c9890;
+}
+
+.rank-btn {
+  background: #1f6f4a;
+  border: 2px solid #163826;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-block;
+  font: 700 16px/1 Arial, "Microsoft YaHei", sans-serif;
+  min-width: 52px;
+  padding: 6px 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.rank-btn:hover {
+  background: #268a5c;
+}
+
+.overlay-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.submit-modal {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 25;
+}
+
+.submit-modal.hidden {
+  display: none;
+}
+
+.submit-dialog {
+  background: #fffdf6;
+  border: 2px solid #28342d;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  width: 360px;
+}
+
+.submit-dialog h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+
+.submit-score {
+  color: #4d554d;
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+
+.submit-score strong {
+  color: #1b2f25;
+  font-size: 22px;
+}
+
+.submit-dialog input {
+  border: 2px solid #28342d;
+  border-radius: 4px;
+  font-size: 16px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+#uploadScoreBtn {
+  background: #45534a;
+  border-color: #2a332e;
+}
+
+b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
+  font-weight: 700;
+}
+
+.toast {
+  align-items: center;
+  animation: toastIn 0.3s ease;
+  background: #1b2f25;
+  border-radius: 8px;
+  bottom: 24px;
+  color: #ffffff;
+  display: flex;
+  font-size: 16px;
+  font-weight: 700;
+  left: 50%;
+  line-height: 1.5;
+  max-width: 420px;
+  padding: 14px 24px;
+  position: absolute;
+  text-align: center;
+  transform: translateX(-50%);
+  z-index: 30;
+}
+
+.toast.hidden {
+  display: none;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

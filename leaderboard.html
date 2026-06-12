@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>排行榜 - 圣娅快跑</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka/Blueaka.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/VanillaNahida/BA-Spark-Cursor/fonts/Blueaka_Bold/Blueaka_Bold.css">
+  <link rel="stylesheet" href="leaderboard.css">
+</head>
+<body>
+  <div class="rank-page">
+    <header class="rank-header">
+      <h1>圣娅快跑 · 排行榜</h1>
+      <a class="rank-back" href="index.html">返回游戏</a>
+    </header>
+
+    <div class="rank-table-wrap">
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th class="col-rank">排名</th>
+            <th class="col-nick">昵称</th>
+            <th class="col-score">成绩</th>
+            <th class="col-msg">留言</th>
+            <th class="col-loc">归属地</th>
+            <th class="col-dev">设备</th>
+            <th class="col-time">更新时间</th>
+          </tr>
+        </thead>
+        <tbody id="rankBody">
+          <tr>
+            <td colspan="7" class="rank-loading">加载中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="rank-footer">
+      <span id="rankCount">共 0 条记录</span>
+    </footer>
+  </div>
+
+  <script src="leaderboard.js"></script>
+</body>
+</html>

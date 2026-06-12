@@ -1,0 +1,196 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  align-items: flex-start;
+  background: #f4f6f1;
+  color: #18201c;
+  display: flex;
+  font-family: "Blueaka", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-weight: 400;
+  justify-content: center;
+  margin: 0;
+  min-height: 100%;
+  padding: 20px 0;
+}
+
+b, strong, h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+}
+
+.rank-page {
+  max-width: 960px;
+  width: min(960px, calc(100vw - 24px));
+}
+
+.rank-header {
+  align-items: center;
+  background: #ffffff;
+  border: 2px solid #28342d;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.rank-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.rank-back {
+  background: #1f6f4a;
+  border: 2px solid #163826;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-block;
+  font: 700 15px/1 Arial, "Microsoft YaHei", sans-serif;
+  padding: 8px 16px;
+  text-decoration: none;
+}
+
+.rank-back:hover {
+  background: #268a5c;
+}
+
+.rank-table-wrap {
+  background: #fffdf6;
+  border-left: 2px solid #28342d;
+  border-right: 2px solid #28342d;
+  overflow-x: auto;
+}
+
+.rank-table {
+  border-collapse: collapse;
+  font-size: 15px;
+  width: 100%;
+}
+
+.rank-table thead {
+  background: #eef1eb;
+}
+
+.rank-table th {
+  border-bottom: 2px solid #28342d;
+  font-size: 14px;
+  padding: 10px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rank-table td {
+  border-bottom: 1px solid #dde7e1;
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+
+.rank-table tr:last-child td {
+  border-bottom: none;
+}
+
+.col-rank {
+  text-align: center;
+  width: 56px;
+}
+
+.col-score {
+  text-align: right;
+  width: 90px;
+}
+
+.col-dev {
+  width: 90px;
+}
+
+.col-loc {
+  width: 120px;
+}
+
+.col-msg {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-nick {
+  width: 110px;
+}
+
+.col-time {
+  white-space: nowrap;
+  width: 130px;
+}
+
+.rank-loading {
+  color: #8c9890;
+  padding: 40px;
+  text-align: center;
+}
+
+.rank-top {
+  color: #c0392b;
+  font-weight: 700;
+}
+
+.rank-footer {
+  background: #ffffff;
+  border: 2px solid #28342d;
+  border-radius: 0 0 8px 8px;
+  border-top: none;
+  color: #5e665d;
+  font-size: 13px;
+  padding: 10px 20px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  body {
+    padding-top: 8px;
+  }
+
+  .rank-header h1 {
+    font-size: 18px;
+  }
+
+  .rank-table {
+    font-size: 13px;
+  }
+
+  .rank-table th {
+    font-size: 12px;
+    padding: 8px 5px;
+  }
+
+  .rank-table td {
+    padding: 8px 5px;
+  }
+
+  .col-rank {
+    width: 40px;
+  }
+
+  .col-score {
+    width: 70px;
+  }
+
+  .col-dev {
+    width: 60px;
+  }
+
+  .col-loc {
+    width: 80px;
+  }
+
+  .col-nick {
+    width: 70px;
+  }
+}
