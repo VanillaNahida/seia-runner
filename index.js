@@ -753,7 +753,7 @@
   var ipInfo = null;
 
   // 页面加载时获取 IP 归属地信息
-  fetch("https://api.silveridc.cn/api/v1/ip")
+  fetch("https://game.xcnahida.cn/api/v1/ip")
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (data.status === 200 && data.ip) {
@@ -804,6 +804,11 @@
 
     if (game.invincible) {
       showToast("作弊模式下无法上传成绩");
+      return;
+    }
+
+    if (game.score === 0) {
+      showToast("成绩不能是0");
       return;
     }
 
