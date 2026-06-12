@@ -3,6 +3,112 @@ require_once __DIR__ . "/init.php";
 
 header("Content-Type: application/json; charset=utf-8");
 
+function getRunnerRank($conn, $score) {
+    $stmt = $conn->prepare("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > ?");
+    $stmt->bind_param("i", $score);
+    $stmt->execute();
+    $rankRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return intval($rankRow["runner_rank"]);
+}
+
+function isValidScoreString($score) {
+    if (!is_string($score) || !ctype_digit($score)) {
+        return false;
+    }
+
+    $normalized = ltrim($score, "0");
+    if ($normalized === "") {
+        return false;
+    }
+
+    $max = "999999";
+    return strlen($normalized) < strlen($max)
+        || (strlen($normalized) === strlen($max) && strcmp($normalized, $max) <= 0);
+}
+
+function enforceScoreRateLimit($fingerprint, $ipAddr) {
+    $dir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "seia-runner-ratelimit";
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        error_log("Failed to create score rate-limit directory: " . $dir);
+        return;
+    }
+
+    $key = hash("sha256", $fingerprint . "|" . $ipAddr);
+    $path = $dir . "/" . $key . ".json";
+    $now = time();
+    $window = [];
+
+    if (is_file($path)) {
+        $raw = file_get_contents($path);
+        $decoded = $raw === false ? [] : json_decode($raw, true);
+        $window = is_array($decoded) ? $decoded : [];
+    }
+
+    $window = array_values(array_filter($window, function ($timestamp) use ($now) {
+        return is_int($timestamp) && $now - $timestamp < 60;
+    }));
+
+    if (count($window) >= 5) {
+        echo json_encode(["code" => 429, "message" => "Too many submissions, please try again later"]);
+        exit;
+    }
+
+    $window[] = $now;
+    file_put_contents($path, json_encode($window), LOCK_EX);
+}
+
+function normalizeClientIp($value) {
+    $value = trim((string)$value, " \t\n\r\0\x0B\"[]");
+    return filter_var($value, FILTER_VALIDATE_IP) ? $value : "";
+}
+
+function firstValidClientIp($value) {
+    foreach (explode(",", (string)$value) as $part) {
+        $ip = normalizeClientIp($part);
+        if ($ip !== "") {
+            return $ip;
+        }
+    }
+
+    return "";
+}
+
+function resolveClientIp() {
+    $singleIpHeaders = [
+        "HTTP_CF_CONNECTING_IP",
+        "HTTP_TRUE_CLIENT_IP",
+        "HTTP_X_REAL_IP",
+        "HTTP_X_CLIENT_IP"
+    ];
+
+    foreach ($singleIpHeaders as $header) {
+        if (!empty($_SERVER[$header])) {
+            $ip = normalizeClientIp($_SERVER[$header]);
+            if ($ip !== "") {
+                return $ip;
+            }
+        }
+    }
+
+    if (!empty($_SERVER["HTTP_X_FORWARDED_FOR"])) {
+        $ip = firstValidClientIp($_SERVER["HTTP_X_FORWARDED_FOR"]);
+        if ($ip !== "") {
+            return $ip;
+        }
+    }
+
+    if (!empty($_POST["ip_addr"])) {
+        $ip = normalizeClientIp($_POST["ip_addr"]);
+        if ($ip !== "") {
+            return $ip;
+        }
+    }
+
+    return normalizeClientIp($_SERVER["REMOTE_ADDR"] ?? "");
+}
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     echo json_encode(["code" => 405, "message" => "Method Not Allowed"]);
     exit;
@@ -10,24 +116,39 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
 $nickname    = isset($_POST["nickname"])    ? trim($_POST["nickname"])    : "";
 $message     = isset($_POST["message"])     ? trim($_POST["message"])     : "";
-$score       = isset($_POST["score"])       ? intval($_POST["score"])     : 0;
-$ip_addr     = isset($_POST["ip_addr"])     ? trim($_POST["ip_addr"])     : "";
+$rawScore    = isset($_POST["score"])       ? trim($_POST["score"])       : "";
+$score       = isValidScoreString($rawScore) ? intval($rawScore)           : 0;
+$ip_addr     = resolveClientIp();
 $device      = isset($_POST["device"])      ? trim($_POST["device"])      : "";
 $location    = isset($_POST["location"])    ? trim($_POST["location"])    : "";
 $fingerprint = isset($_POST["fingerprint"])  ? trim($_POST["fingerprint"]) : "";
+$scoreNonce  = isset($_POST["score_nonce"]) ? trim($_POST["score_nonce"]) : "";
+
+if (mb_strlen($fingerprint, "UTF-8") > 128) {
+    echo json_encode(["code" => 400, "message" => "Fingerprint is too long"]);
+    exit;
+}
+if (mb_strlen($device, "UTF-8") > 50) {
+    echo json_encode(["code" => 400, "message" => "Device info is too long"]);
+    exit;
+}
+if (mb_strlen($location, "UTF-8") > 100) {
+    echo json_encode(["code" => 400, "message" => "Location is too long"]);
+    exit;
+}
 
 // 昵称校验
 if ($nickname === "") {
     echo json_encode(["code" => 400, "message" => "请输入昵称"]);
     exit;
 }
-if (mb_strlen($nickname) > 10) {
+if (mb_strlen($nickname, "UTF-8") > 10) {
     echo json_encode(["code" => 400, "message" => "昵称不能超过10个字"]);
     exit;
 }
 
 // 留言长度校验
-if (mb_strlen($message) > 30) {
+if (mb_strlen($message, "UTF-8") > 30) {
     echo json_encode(["code" => 400, "message" => "留言不能超过30个字"]);
     exit;
 }
@@ -65,6 +186,13 @@ if ($message !== "") {
     }
 }
 
+if (!consumeScoreNonce($scoreNonce)) {
+    echo json_encode(["code" => 403, "message" => "Score submission expired, please try again"]);
+    exit;
+}
+
+enforceScoreRateLimit($fingerprint, $ip_addr);
+
 $conn = getDB();
 
 // 查询是否已存在同指纹+同设备的记录
@@ -89,9 +217,7 @@ if ($existing) {
         $stmt->execute();
         $stmt->close();
 
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
+        $rank = getRunnerRank($conn, $score);
 
         echo json_encode([
             "code" => 0,
@@ -112,9 +238,7 @@ if ($existing) {
         $stmt->execute();
         $stmt->close();
 
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $oldScore");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
+        $rank = getRunnerRank($conn, $oldScore);
 
         echo json_encode([
             "code" => 0,
@@ -137,9 +261,7 @@ if ($existing) {
     if ($stmt->execute()) {
         $rankId = $conn->insert_id;
 
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
+        $rank = getRunnerRank($conn, $score);
 
         echo json_encode([
             "code" => 0,

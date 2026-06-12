@@ -2,6 +2,42 @@ var currentPage = 1;
 var currentType = 'all';
 var currentQuery = '';
 var currentPageSize = '10';
+var allowedTypes = ['day', 'week', 'month', 'all'];
+var allowedPageSizes = ['10', '20', '50', '100', 'all'];
+
+function escapeHTML(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function normalizeType(type) {
+    return allowedTypes.indexOf(type) !== -1 ? type : 'day';
+}
+
+function normalizePage(page) {
+    var num = parseInt(page, 10);
+    return isNaN(num) || num < 1 ? 1 : num;
+}
+
+function normalizePageSize(pageSize) {
+    var str = String(pageSize || '10');
+    return allowedPageSizes.indexOf(str) !== -1 ? str : '10';
+}
+
+function buildPageHref(type, pageSize, page, query) {
+    var params = new URLSearchParams();
+    params.set('type', normalizeType(type));
+    params.set('pageSize', normalizePageSize(pageSize));
+    params.set('page', normalizePage(page));
+    if (query) {
+        params.set('query', query);
+    }
+    return '?' + params.toString();
+}
 
 function getQueryParam(name) {
     var urlParams = new URLSearchParams(window.location.search);
@@ -11,10 +47,10 @@ function getQueryParam(name) {
 function updateURL(type, page, query, pageSize) {
     var url = new URL(window.location);
     if (type) {
-        url.searchParams.set('type', type);
+        url.searchParams.set('type', normalizeType(type));
     }
     if (page) {
-        url.searchParams.set('page', page);
+        url.searchParams.set('page', normalizePage(page));
     }
     if (query) {
         url.searchParams.set('query', query);
@@ -22,8 +58,9 @@ function updateURL(type, page, query, pageSize) {
     } else {
         url.searchParams.delete('query');
     }
-    if (pageSize && pageSize !== '10') {
-        url.searchParams.set('pageSize', pageSize);
+    var safePageSize = normalizePageSize(pageSize);
+    if (safePageSize !== '10') {
+        url.searchParams.set('pageSize', safePageSize);
     } else {
         url.searchParams.delete('pageSize');
     }
@@ -77,12 +114,12 @@ function renderTable(data, total, page, pageSize) {
 
         html += '<tr>' +
             '<td class="col-rank">' + rank + suffix + '</td>' +
-            '<td class="col-nick">' + item.nickname + '</td>' +
-            '<td class="col-score">' + item.score + '</td>' +
-            '<td class="col-msg">' + (item.message || '') + '</td>' +
-            '<td class="col-loc">' + item.location + '</td>' +
-            '<td class="col-dev">' + item.device + '</td>' +
-            '<td class="col-time">' + time + '</td>' +
+            '<td class="col-nick">' + escapeHTML(item.nickname) + '</td>' +
+            '<td class="col-score">' + escapeHTML(item.score) + '</td>' +
+            '<td class="col-msg">' + escapeHTML(item.message || '') + '</td>' +
+            '<td class="col-loc">' + escapeHTML(item.location) + '</td>' +
+            '<td class="col-dev">' + escapeHTML(item.device) + '</td>' +
+            '<td class="col-time">' + escapeHTML(time) + '</td>' +
             '</tr>';
     });
 
@@ -107,13 +144,13 @@ function renderCards(data, total, page, pageSize) {
 
         html += '<div class="rank-item">' +
             '<div class="rank-item-header">' +
-            '<span class="rank-name">' + rank + suffix + ' ' + item.nickname + '</span>' +
-            '<span class="rank-time">' + time + '</span>' +
+            '<span class="rank-name">' + rank + suffix + ' ' + escapeHTML(item.nickname) + '</span>' +
+            '<span class="rank-time">' + escapeHTML(time) + '</span>' +
             '</div>' +
             '<div class="rank-item-body">' +
-            '<div class="rank-score">SCORE: <strong>' + item.score + '</strong></div>' +
-            '<div class="rank-info">' + item.device + ' - ' + item.location + '</div>' +
-            (item.message ? '<div class="rank-message">' + item.message + '</div>' : '') +
+            '<div class="rank-score">SCORE: <strong>' + escapeHTML(item.score) + '</strong></div>' +
+            '<div class="rank-info">' + escapeHTML(item.device) + ' - ' + escapeHTML(item.location) + '</div>' +
+            (item.message ? '<div class="rank-message">' + escapeHTML(item.message) + '</div>' : '') +
             '</div>' +
             '</div>';
     });
@@ -124,6 +161,8 @@ function renderCards(data, total, page, pageSize) {
 function renderPagination(total, pageSize, currentPage) {
     var pagination = document.getElementById('pagination');
     var totalPages = Math.ceil(total / pageSize);
+    var safeType = normalizeType(currentType);
+    var safePageSize = normalizePageSize(currentPageSize);
 
     if (totalPages <= 1) {
         pagination.innerHTML = '';
@@ -133,21 +172,21 @@ function renderPagination(total, pageSize, currentPage) {
     var html = '<ul class="pagination">';
 
     if (currentPage > 1) {
-        html += '<li><a href="?type=' + currentType + '&pageSize=' + currentPageSize + '&page=' + (currentPage - 1) + (currentQuery ? '&query=' + encodeURIComponent(currentQuery) : '') + '">&laquo;</a></li>';
+        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage - 1, currentQuery) + '">&laquo;</a></li>';
     } else {
         html += '<li class="disabled"><a href="#">&laquo;</a></li>';
     }
 
     for (var i = 1; i <= totalPages; i++) {
         if (i === currentPage) {
-            html += '<li class="active"><a href="?type=' + currentType + '&pageSize=' + currentPageSize + '&page=' + i + (currentQuery ? '&query=' + encodeURIComponent(currentQuery) : '') + '">' + i + '</a></li>';
+            html += '<li class="active"><a href="' + buildPageHref(safeType, safePageSize, i, currentQuery) + '">' + i + '</a></li>';
         } else {
-            html += '<li><a href="?type=' + currentType + '&pageSize=' + currentPageSize + '&page=' + i + (currentQuery ? '&query=' + encodeURIComponent(currentQuery) : '') + '">' + i + '</a></li>';
+            html += '<li><a href="' + buildPageHref(safeType, safePageSize, i, currentQuery) + '">' + i + '</a></li>';
         }
     }
 
     if (currentPage < totalPages) {
-        html += '<li><a href="?type=' + currentType + '&pageSize=' + currentPageSize + '&page=' + (currentPage + 1) + (currentQuery ? '&query=' + encodeURIComponent(currentQuery) : '') + '">&raquo;</a></li>';
+        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage + 1, currentQuery) + '">&raquo;</a></li>';
     } else {
         html += '<li class="disabled"><a href="#">&raquo;</a></li>';
     }
@@ -159,15 +198,18 @@ function renderPagination(total, pageSize, currentPage) {
 function loadData(type, page, pageSize, query) {
     var url = 'api/get_scores.php';
     var params = [];
+    var safeType = normalizeType(type || currentType);
+    var safePage = normalizePage(page || currentPage);
+    var safePageSize = normalizePageSize(pageSize || currentPageSize);
 
-    if (type) {
-        params.push('type=' + type);
+    if (safeType) {
+        params.push('type=' + encodeURIComponent(safeType));
     }
-    if (page) {
-        params.push('page=' + page);
+    if (safePage) {
+        params.push('page=' + safePage);
     }
-    if (pageSize) {
-        params.push('pageSize=' + pageSize);
+    if (safePageSize) {
+        params.push('pageSize=' + encodeURIComponent(safePageSize));
     }
     if (query) {
         params.push('query=' + encodeURIComponent(query));
@@ -181,10 +223,10 @@ function loadData(type, page, pageSize, query) {
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (data.code === 0) {
-                currentType = type || currentType;
-                currentPage = page || currentPage;
-                currentQuery = query || currentQuery;
-                currentPageSize = pageSize || currentPageSize;
+                currentType = safeType;
+                currentPage = safePage;
+                currentQuery = query || '';
+                currentPageSize = safePageSize;
 
                 document.getElementById('rankTitle').textContent =
                     (currentQuery ? '搜索: ' + currentQuery : '排行榜[' + getTypeLabel(currentType) + ']');
@@ -220,10 +262,10 @@ function updateNavActive() {
 }
 
 function init() {
-    var type = getQueryParam('type') || 'day';
-    var page = parseInt(getQueryParam('page')) || 1;
+    var type = normalizeType(getQueryParam('type') || 'day');
+    var page = normalizePage(getQueryParam('page') || 1);
     var query = getQueryParam('query') || '';
-    var pageSize = getQueryParam('pageSize') || '10';
+    var pageSize = normalizePageSize(getQueryParam('pageSize') || '10');
 
     currentType = type;
     currentPage = page;
