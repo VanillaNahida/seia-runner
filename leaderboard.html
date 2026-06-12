@@ -10,11 +10,45 @@
   <link rel="stylesheet" href="leaderboard.css">
 </head>
 <body>
+  <nav class="rank-nav">
+    <div class="nav-inner">
+      <div class="nav-brand">圣娅快跑 · 排行榜</div>
+      <button class="nav-toggle" aria-label="切换导航">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="nav-menu">
+        <a href="?type=day" class="nav-item active">日榜</a>
+        <a href="?type=week" class="nav-item">周榜</a>
+        <a href="?type=month" class="nav-item">月榜</a>
+        <a href="?type=all" class="nav-item">总榜</a>
+        <a href="index.html" class="nav-item nav-back">返回游戏</a>
+      </div>
+    </div>
+  </nav>
+
   <div class="rank-page">
-    <header class="rank-header">
-      <h1>圣娅快跑 · 排行榜</h1>
-      <a class="rank-back" href="index.html">返回游戏</a>
-    </header>
+    <div class="rank-header">
+      <h1 id="rankTitle">排行榜[日]</h1>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索昵称" maxlength="10">
+        <button id="searchBtn">查询</button>
+      </div>
+    </div>
+
+    <div class="rank-controls">
+      <label class="page-size-label">
+        每页显示：
+        <select id="pageSizeSelect">
+          <option value="10">10 条</option>
+          <option value="20">20 条</option>
+          <option value="50">50 条</option>
+          <option value="100">100 条</option>
+          <option value="all">全部</option>
+        </select>
+      </label>
+    </div>
 
     <div class="rank-table-wrap">
       <table class="rank-table">
@@ -29,7 +63,7 @@
             <th class="col-time">更新时间</th>
           </tr>
         </thead>
-        <tbody id="rankBody">
+        <tbody id="rankTableBody">
           <tr>
             <td colspan="7" class="rank-loading">加载中...</td>
           </tr>
@@ -37,10 +71,18 @@
       </table>
     </div>
 
-    <footer class="rank-footer">
-      <span id="rankCount">共 0 条记录</span>
-    </footer>
+    <div class="rank-list" id="rankList">
+      <div class="rank-item loading">
+        <div class="loading-text">加载中...</div>
+      </div>
+    </div>
+
+    <nav class="rank-pagination" id="pagination"></nav>
   </div>
+
+  <footer class="rank-footer">
+    <span id="recordCount">共 0 条记录</span>
+  </footer>
 
   <script src="leaderboard.js"></script>
 </body>

@@ -1,0 +1,3 @@
+<FilesMatch "^(config\.php|init\.php|cheat_code\.txt)$">
+  Require all denied
+</FilesMatch>

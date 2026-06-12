@@ -160,53 +160,47 @@ button:active {
 @media (max-width: 560px) {
   body {
     align-items: flex-start;
-    padding-top: 10px;
+    padding-top: 6px;
+  }
+
+  .page-shell {
+    width: calc(100vw - 12px);
+    max-width: none;
   }
 
   .hud {
     align-items: flex-start;
-    min-height: 72px;
-    padding: 9px 10px;
+    min-height: 52px;
+    padding: 6px 8px;
   }
 
   .hud strong {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .hud span {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .scoreboard {
-    font-size: 15px;
-    gap: 6px;
-    min-width: 112px;
+    font-size: 14px;
+    gap: 4px;
+    min-width: 100px;
   }
 
   .overlay {
-    inset: 72px 0 0;
-  }
-
-  .page-shell {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 10px);
-  }
-
-  .game-shell {
-    flex-shrink: 0;
+    inset: 52px 0 0;
   }
 
   .mobile-controls {
-    flex: 1;
-    align-content: center;
-    gap: 14px;
-    padding: 4px 10px 20px;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 0 6px 6px;
   }
 
   .control-button {
-    font-size: 28px;
-    min-height: 110px;
+    font-size: 18px;
+    min-height: 52px;
   }
 }
 
@@ -216,7 +210,7 @@ button:active {
   display: flex;
   inset: 0;
   justify-content: center;
-  position: absolute;
+  position: fixed;
   z-index: 20;
 }
 
@@ -299,7 +293,7 @@ button:active {
   display: flex;
   inset: 0;
   justify-content: center;
-  position: absolute;
+  position: fixed;
   z-index: 25;
 }
 
@@ -355,7 +349,6 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
   animation: toastIn 0.3s ease;
   background: #1b2f25;
   border-radius: 8px;
-  bottom: 24px;
   color: #ffffff;
   display: flex;
   font-size: 16px;
@@ -364,8 +357,9 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
   line-height: 1.5;
   max-width: 420px;
   padding: 14px 24px;
-  position: absolute;
+  position: fixed;
   text-align: center;
+  top: 24px;
   transform: translateX(-50%);
   z-index: 30;
 }
@@ -377,7 +371,7 @@ b, strong, h1, h2, h3, h4, h5, h6, .bold-text {
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(12px);
+    transform: translateX(-50%) translateY(-12px);
   }
   to {
     opacity: 1;
