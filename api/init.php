@@ -21,7 +21,7 @@ function getDB() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         nickname VARCHAR(30) NOT NULL,
         message VARCHAR(90) NOT NULL,
-        score INT NOT NULL DEFAULT 0,
+        score BIGINT NOT NULL DEFAULT 0,
         ip_addr VARCHAR(45) NOT NULL DEFAULT '',
         device VARCHAR(50) NOT NULL DEFAULT '',
         location VARCHAR(100) NOT NULL DEFAULT '',
@@ -32,11 +32,13 @@ function getDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
     $conn->query($sql);
 
-    // 旧表兼容: 尝试添加缺失的列，升级唯一键为 fingerprint+device
+    // 旧表兼容: 尝试添加缺失的列，升级唯一键为 fingerprint+device，score 升级为 BIGINT
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN fingerprint VARCHAR(128) NOT NULL DEFAULT '' AFTER location"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank DROP INDEX uk_fingerprint_ip"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank ADD UNIQUE uk_fingerprint_device (fingerprint, device)"); } catch (Exception $e) {}
+    // 旧表兼容: 尝试升级 score 列为 BIGINT
+    try { $conn->query("ALTER TABLE seia_score_rank MODIFY COLUMN score BIGINT NOT NULL DEFAULT 0"); } catch (Exception $e) {}
 
     return $conn;
 }
