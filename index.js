@@ -756,7 +756,7 @@
   fetch("https://game.xcnahida.cn/api/v1/ip")
     .then(function (res) { return res.json(); })
     .then(function (data) {
-      if (data.status === 200 && data.ip) {
+      if (data.code === 0 && data.data) {
         ipInfo = data;
       }
     })
@@ -808,7 +808,7 @@
     }
 
     if (game.score === 0) {
-      showToast("成绩不能是0");
+      showToast("没有成绩数据，请先开始游戏！");
       return;
     }
 
@@ -875,15 +875,14 @@
     formData.append("nickname", nickname);
     formData.append("message", message);
     formData.append("score", String(game.score));
-    formData.append("ip_addr", ipInfo ? ipInfo.ip || "" : "");
+    formData.append("ip_addr", ipInfo ? ipInfo.data.addr || "" : "");
     formData.append("device", getUserDevice());
     formData.append("fingerprint", getUserFingerprint());
 
-    if (ipInfo && ipInfo.region) {
+    if (ipInfo && ipInfo.data) {
       var locParts = [];
-      if (ipInfo.region.country) locParts.push(ipInfo.region.country);
-      if (ipInfo.region.province) locParts.push(ipInfo.region.province);
-      if (ipInfo.region.city) locParts.push(ipInfo.region.city);
+      if (ipInfo.data.country) locParts.push(ipInfo.data.country);
+      if (ipInfo.data.province) locParts.push(ipInfo.data.province);
       formData.append("location", locParts.join("·"));
     } else {
       formData.append("location", "");

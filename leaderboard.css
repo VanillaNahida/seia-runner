@@ -166,6 +166,22 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   background: #268a5c;
 }
 
+.rank-notice {
+  max-width: 480px;
+  margin: 0 auto 14px;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border: 2px solid #e6c34a;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.rank-notice p {
+  font-size: 13px;
+  color: #8b6914;
+  line-height: 1.6;
+}
+
 .rank-controls {
   padding: 0 20px 14px;
   text-align: right;
