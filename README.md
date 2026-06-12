@@ -109,7 +109,8 @@ seia-runner/
 
 # 致谢
 
-- [zhaoyj7](https://github.com/zhaoyj7)：感谢其提供IP地址查询和技术支持
+- [zhaoyj7](https://github.com/zhaoyj7)：提供IP地址查询和技术支持
+- [zoujingli](https://github.com/zoujingli/ip2region)：IP地址归属地数据库支持
 
 # Bug 反馈
 
