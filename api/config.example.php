@@ -1,4 +1,9 @@
 <?php
+// 禁止直接访问
+if (basename($_SERVER["SCRIPT_FILENAME"]) === "config.php") {
+    header("HTTP/1.0 403 Forbidden");
+    exit;
+}
 // 数据库配置
 $DB_HOST = "localhost";
 $DB_USER = "root";
