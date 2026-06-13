@@ -125,23 +125,25 @@ function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $op
         return false;
     }
 
+    $scoreElapsed = $elapsed;
     if ($clientElapsedMs !== null) {
         if (!is_int($clientElapsedMs) || $clientElapsedMs < 500 || $clientElapsedMs > 3600000) {
             return false;
         }
 
         $clientElapsed = $clientElapsedMs / 1000;
-        if (abs($clientElapsed - $elapsed) > max(2.0, $elapsed * 0.2)) {
+        if ($clientElapsed > $elapsed + 2.0) {
             return false;
         }
+        $scoreElapsed = $clientElapsed;
     }
 
     if (is_callable($operationProof) && !$operationProof($session)) {
         return false;
     }
 
-    $maxScore = calculateMaxLegitScore($elapsed) + 120;
-    $minScore = max(1, calculateMinLegitScore($elapsed) - 120);
+    $maxScore = calculateMaxLegitScore($scoreElapsed) + 120;
+    $minScore = max(1, calculateMinLegitScore($scoreElapsed) - 120);
 
     return $score >= $minScore && $score <= $maxScore;
 }

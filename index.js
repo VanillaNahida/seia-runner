@@ -10,7 +10,10 @@
   var startButton = document.getElementById("startButton");
   var jumpButton = document.getElementById("jumpButton");
   var duckButton = document.getElementById("duckButton");
+  var scoreCompareNav = document.getElementById("scoreCompareNav");
+  var scoreCompareButton = document.getElementById("scoreCompareButton");
   var scoreCompareList = document.getElementById("scoreCompareList");
+  var scoreCompareEnabled = localStorage.getItem("seia-runner-score-compare-enabled") === "1";
   var compareScores = [];
   var nextCompareFetchAt = 0;
   var lastCompareRenderedScore = -1;
@@ -234,9 +237,31 @@
     }
   }
 
+  function applyScoreCompareVisibility() {
+    scoreCompareNav.classList.toggle("hidden", !scoreCompareEnabled);
+    scoreCompareButton.textContent = "成绩条: " + (scoreCompareEnabled ? "开" : "关");
+    scoreCompareButton.classList.toggle("is-on", scoreCompareEnabled);
+
+    if (scoreCompareEnabled) {
+      updateScoreCompare();
+      fetchCompareScores(true);
+    }
+  }
+
+  function toggleScoreCompare() {
+    scoreCompareEnabled = !scoreCompareEnabled;
+    localStorage.setItem("seia-runner-score-compare-enabled", scoreCompareEnabled ? "1" : "0");
+    applyScoreCompareVisibility();
+  }
+
   bgmButton.addEventListener("click", function (e) {
     e.preventDefault();
     switchBgm();
+  });
+
+  scoreCompareButton.addEventListener("click", function (e) {
+    e.preventDefault();
+    toggleScoreCompare();
   });
 
   var helpButton = document.getElementById("helpButton");
@@ -926,6 +951,7 @@
     cheatSound: cheatSound
   });
 
+  applyScoreCompareVisibility();
   updateScore();
   loadAssets();
 }());

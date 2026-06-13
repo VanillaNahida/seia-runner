@@ -96,6 +96,10 @@ canvas {
   z-index: 5;
 }
 
+.score-compare-nav.hidden {
+  display: none;
+}
+
 .score-compare-title {
   border-bottom: 1px solid #dde7e1;
   color: #1b2f25;
@@ -207,7 +211,8 @@ canvas {
     padding: 0 6px 4px;
   }
 
-  .bgm-button {
+  .bgm-button,
+  .score-compare-button {
     font-size: 13px;
     min-height: 36px;
   }
