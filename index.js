@@ -613,6 +613,9 @@
   }
 
   window.addEventListener("keydown", function (event) {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -630,6 +633,9 @@
   });
 
   window.addEventListener("keyup", function (event) {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -645,6 +651,9 @@
   });
 
   canvas.addEventListener("pointerdown", function () {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -654,6 +663,9 @@
     jump();
   });
   canvas.addEventListener("pointerup", function () {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -662,6 +674,9 @@
     player.jumpHold = 0;
   });
   canvas.addEventListener("pointercancel", function () {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -671,6 +686,9 @@
   });
 
   function pressJumpButton(event) {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -682,12 +700,18 @@
   }
 
   function releaseJumpButton(event) {
+    if (state === "gameover") {
+      return;
+    }
     event.preventDefault();
     input.jumpHeld = false;
     player.jumpHold = 0;
   }
 
   function pressDuckButton(event) {
+    if (state === "gameover") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -698,6 +722,9 @@
   }
 
   function releaseDuckButton(event) {
+    if (state === "gameover") {
+      return;
+    }
     event.preventDefault();
     setDuck(false);
   }
