@@ -355,6 +355,22 @@ function init() {
         }
     });
 
+    // 桌面端表格留言点击展开/收起
+    document.getElementById('rankTableBody').addEventListener('click', function(e) {
+        var target = e.target.closest('.col-msg');
+        if (target) {
+            target.classList.toggle('expanded');
+        }
+    });
+
+    // 手机端卡片留言点击展开/收起
+    document.getElementById('rankList').addEventListener('click', function(e) {
+        var target = e.target.closest('.rank-message');
+        if (target) {
+            target.classList.toggle('expanded');
+        }
+    });
+
     loadData(type, page, pageSize, query);
 }
 

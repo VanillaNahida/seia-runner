@@ -81,11 +81,13 @@ function getStrictPayloadString($payload, $key, $maxBytes) {
 }
 
 function isSafeNickname($value) {
-    return is_string($value) && preg_match('/^[\p{L}\p{N}_\-\s\x{4e00}-\x{9fa5}]{1,10}$/u', $value);
+    $maxLen = defined("NICKNAME_MAX_LENGTH") ? (int)NICKNAME_MAX_LENGTH : 10;
+    return is_string($value) && preg_match('/^[\p{L}\p{N}_\-\s\x{4e00}-\x{9fa5}]{1,' . $maxLen . '}$/u', $value);
 }
 
 function isSafeMessage($value) {
-    return is_string($value) && preg_match('/^[\p{L}\p{N}_\-\s\x{4e00}-\x{9fa5}，。！？,.!?、:：()（）]{0,30}$/u', $value);
+    $maxLen = defined("MESSAGE_MAX_LENGTH") ? (int)MESSAGE_MAX_LENGTH : 30;
+    return is_string($value) && preg_match('/^[\p{L}\p{N}_\-\s\x{4e00}-\x{9fa5}，。！？,.!?、:：()（）]{0,' . $maxLen . '}$/u', $value);
 }
 
 function isSafeFingerprint($value) {

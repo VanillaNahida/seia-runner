@@ -177,6 +177,21 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   text-align: center;
 }
 
+.notice-title {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.notice-icon {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+}
+
 .rank-notice p {
   font-size: 13px;
   color: #8b6914;
@@ -265,6 +280,17 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   color: #3d4743;
   padding-top: 8px;
   border-top: 1px dashed #dde7e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rank-message.expanded {
+  white-space: normal;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 120px;
 }
 
 .rank-pagination {
@@ -448,6 +474,13 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.col-msg.expanded {
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
 }
 
 .col-nick {

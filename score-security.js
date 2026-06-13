@@ -484,6 +484,22 @@
     var submitCancel = document.getElementById("submitCancel");
     var ipInfo = null;
     var cheatCodes = [];
+    var nicknameMaxLen = 10;
+    var messageMaxLen = 30;
+
+    fetch("api/get_limits.php")
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.code === 0 && data.data) {
+          nicknameMaxLen = data.data.nickname_max_length;
+          messageMaxLen = data.data.message_max_length;
+          submitNickname.maxLength = nicknameMaxLen;
+          submitNickname.setAttribute("placeholder", "昵称（最多" + nicknameMaxLen + "个字）");
+          submitMessage.maxLength = messageMaxLen;
+          submitMessage.setAttribute("placeholder", "留言（最多" + messageMaxLen + "个字，可选）");
+        }
+      })
+      .catch(function() {});
 
     function isCheatModalOpen() {
       return !cheatModal.classList.contains("hidden");
@@ -600,8 +616,10 @@
     });
 
     submitConfirm.addEventListener("click", function () {
-      var nickname = normalizeSubmitText(submitNickname.value, 10, /^[\p{L}\p{N}_\-\s\u4e00-\u9fa5]{1,10}$/u);
-      var message = normalizeSubmitText(submitMessage.value, 30, /^[\p{L}\p{N}_\-\s\u4e00-\u9fa5，。！？,.!?、:：()（）]*$/u);
+      var nicknamePattern = new RegExp('^[\\p{L}\\p{N}_\\-\\s\\u4e00-\\u9fa5]{1,' + nicknameMaxLen + '}$', 'u');
+      var messagePattern = /^[\p{L}\p{N}_\-\s\u4e00-\u9fa5，。！？,.!?、:：()（）]*$/u;
+      var nickname = normalizeSubmitText(submitNickname.value, nicknameMaxLen, nicknamePattern);
+      var message = normalizeSubmitText(submitMessage.value, messageMaxLen, messagePattern);
 
       if (nickname === null) {
         submitError.textContent = "昵称只能包含中英文、数字、空格、下划线和短横线";
@@ -609,8 +627,8 @@
         return;
       }
 
-      if (nickname.length > 10) {
-        submitError.textContent = "昵称不能超过10个字";
+      if (nickname.length > nicknameMaxLen) {
+        submitError.textContent = "昵称不能超过" + nicknameMaxLen + "个字";
         submitError.classList.remove("hidden");
         return;
       }
