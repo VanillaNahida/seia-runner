@@ -242,10 +242,13 @@
     scoreCompareButton.textContent = "成绩条: " + (scoreCompareEnabled ? "开" : "关");
     scoreCompareButton.classList.toggle("is-on", scoreCompareEnabled);
 
-    if (scoreCompareEnabled) {
-      updateScoreCompare();
-      fetchCompareScores(true);
+    if (!scoreCompareEnabled) {
+      lastCompareRenderedScore = -1;
+      return;
     }
+
+    updateScoreCompare();
+    fetchCompareScores(true);
   }
 
   function toggleScoreCompare() {
@@ -697,7 +700,7 @@
   }
 
   function updateScoreCompare() {
-    if (!scoreCompareList || lastCompareRenderedScore === game.score) {
+    if (!scoreCompareEnabled || !scoreCompareList || lastCompareRenderedScore === game.score) {
       return;
     }
 

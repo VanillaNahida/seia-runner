@@ -497,9 +497,7 @@
             game.token = "";
             uploadScoreBtn.classList.add("hidden");
             localStorage.setItem("seia-runner-nick", nickname);
-            if (!data.data.oldScore) {
-              localStorage.setItem("seia-runner-msg", message);
-            }
+            localStorage.setItem("seia-runner-msg", message);
             closeSubmitModal();
             if (data.data.updated) {
               showToast("成绩已更新！提高了 " + data.data.improved + " 分，当前排名第 " + data.data.rank + " 名");

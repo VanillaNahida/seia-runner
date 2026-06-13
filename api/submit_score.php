@@ -553,18 +553,25 @@ try {
                 ]
             ]);
         } else {
-            // 已有更高记录，不允许用低分覆盖最高成绩对应的提交信息
+            // 已有更高或相同成绩时，保留最高分，但允许修改昵称和留言
+            $stmt = $conn->prepare(
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+            );
+            $stmt->bind_param("ssssi", $nickname, $message, $device, $location, $oldId);
+            $stmt->execute();
+            $stmt->close();
+
             $rank = getRunnerRank($conn, $oldScore);
 
             echo json_encode([
                 "code" => 0,
-                "message" => "你有更高的成绩 (" . $oldScore . " 分)，当前排名第 " . $rank . " 名。本次低分提交不会覆盖排行榜信息。",
+                "message" => "提交信息已更新，保留最高成绩 " . $oldScore . " 分，当前排名第 " . $rank . " 名。",
                 "data" => [
                     "id" => $oldId,
                     "rank" => $rank,
                     "updated" => false,
                     "oldScore" => $oldScore,
-                    "keptRecord" => true
+                    "infoUpdated" => true
                 ]
             ]);
         }

@@ -196,6 +196,18 @@ canvas {
   width: 100%;
 }
 
+.score-compare-button {
+  background: #6f5a3a;
+  font-size: 15px;
+  min-height: 40px;
+  min-width: 0;
+  width: 100%;
+}
+
+.score-compare-button.is-on {
+  background: #1f6f4a;
+}
+
 .help-button {
   background: #4a7a6a;
   font-size: 15px;
