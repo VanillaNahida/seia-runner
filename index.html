@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="//cdn.xcnahida.cn/fonts/bluearchive/Blueaka/Blueaka.css">
   <link rel="stylesheet" href="//cdn.xcnahida.cn/fonts/bluearchive/Blueaka_Bold/Blueaka_Bold.css">
   <link rel="stylesheet" href="./index.css">
+  <script defer="" src="./score-security.js"></script>
   <script defer="" src="./index.js"></script>
 </head>
 <body>
@@ -28,6 +29,13 @@
       </div>
 
       <canvas id="game" width="960" height="360"></canvas>
+
+      <aside id="scoreCompareNav" class="score-compare-nav" aria-label="实时成绩对比">
+        <div class="score-compare-title">成绩距离</div>
+        <div id="scoreCompareList" class="score-compare-list">
+          <div class="score-compare-empty">开始游戏后显示与其他玩家的距离</div>
+        </div>
+      </aside>
 
       <div id="overlay" class="overlay">
         <h1>圣娅快跑</h1>

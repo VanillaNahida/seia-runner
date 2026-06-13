@@ -66,6 +66,109 @@ function consumeScoreNonce($nonce) {
     return true;
 }
 
+function pruneGameSessions() {
+    ensureScoreSession();
+
+    $now = time();
+    if (!isset($_SESSION["game_sessions"]) || !is_array($_SESSION["game_sessions"])) {
+        $_SESSION["game_sessions"] = [];
+        return;
+    }
+
+    foreach ($_SESSION["game_sessions"] as $token => $session) {
+        if (!is_array($session) || !isset($session["expires_at"]) || intval($session["expires_at"]) < $now) {
+            unset($_SESSION["game_sessions"][$token]);
+        }
+    }
+}
+
+function issueGameSession() {
+    pruneGameSessions();
+
+    $token = bin2hex(random_bytes(32));
+    $challengeSeed = bin2hex(random_bytes(16));
+    $challenge = [
+        "seed" => $challengeSeed,
+        "difficulty" => 2,
+        "interval_ms" => 1200,
+        "max_nonce" => 200000
+    ];
+    $_SESSION["game_sessions"][$token] = [
+        "started_at" => microtime(true),
+        "proof_salt" => bin2hex(random_bytes(16)),
+        "hash_challenge" => $challenge,
+        "expires_at" => time() + 3600
+    ];
+
+    return [
+        "token" => $token,
+        "hashChallenge" => $challenge
+    ];
+}
+
+function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $operationProof = null) {
+    pruneGameSessions();
+
+    if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+        return false;
+    }
+
+    if (!isset($_SESSION["game_sessions"][$token]) || !is_array($_SESSION["game_sessions"][$token])) {
+        return false;
+    }
+
+    $session = $_SESSION["game_sessions"][$token];
+    unset($_SESSION["game_sessions"][$token]);
+
+    $elapsed = microtime(true) - floatval($session["started_at"] ?? 0);
+    if ($elapsed < 0.5 || $elapsed > 3600) {
+        return false;
+    }
+
+    if ($clientElapsedMs !== null) {
+        if (!is_int($clientElapsedMs) || $clientElapsedMs < 500 || $clientElapsedMs > 3600000) {
+            return false;
+        }
+
+        $clientElapsed = $clientElapsedMs / 1000;
+        if (abs($clientElapsed - $elapsed) > max(2.0, $elapsed * 0.2)) {
+            return false;
+        }
+    }
+
+    if (is_callable($operationProof) && !$operationProof($session)) {
+        return false;
+    }
+
+    $maxScore = calculateMaxLegitScore($elapsed) + 120;
+    $minScore = max(1, calculateMinLegitScore($elapsed) - 120);
+
+    return $score >= $minScore && $score <= $maxScore;
+}
+
+function calculateMinLegitScore($elapsed) {
+    $elapsed = max(0, floatval($elapsed));
+    if ($elapsed < 0.5) {
+        return 0;
+    }
+
+    return intval(floor(410 * $elapsed / 10));
+}
+
+function calculateMaxLegitScore($elapsed) {
+    $elapsed = max(0, floatval($elapsed));
+    $timeToCap = (720 - 410) / 7.5;
+
+    if ($elapsed <= $timeToCap) {
+        $distance = 410 * $elapsed + 0.5 * 7.5 * $elapsed * $elapsed;
+    } else {
+        $distanceToCap = 410 * $timeToCap + 0.5 * 7.5 * $timeToCap * $timeToCap;
+        $distance = $distanceToCap + 720 * ($elapsed - $timeToCap);
+    }
+
+    return intval(floor($distance / 10));
+}
+
 function getDB() {
     global $DB_HOST, $DB_USER, $DB_PASS, $DB_NAME;
 

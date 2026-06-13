@@ -81,6 +81,70 @@ canvas {
   width: 100%;
 }
 
+.score-compare-nav {
+  background: rgba(255, 253, 246, 0.94);
+  border: 2px solid #28342d;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(32, 42, 35, 0.14);
+  max-height: 236px;
+  overflow: hidden;
+  padding: 10px;
+  position: absolute;
+  right: 10px;
+  top: 72px;
+  width: 176px;
+  z-index: 5;
+}
+
+.score-compare-title {
+  border-bottom: 1px solid #dde7e1;
+  color: #1b2f25;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+.score-compare-list {
+  display: grid;
+  gap: 6px;
+  max-height: 184px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.score-compare-item {
+  background: #ffffff;
+  border-left: 4px solid #c0392b;
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+.score-compare-item.is-ahead {
+  border-left-color: #1f6f4a;
+}
+
+.score-compare-meta {
+  color: #5e665d;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-compare-distance {
+  color: #1b2f25;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.score-compare-empty {
+  color: #5e665d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .mobile-controls {
   align-items: center;
   display: grid;
@@ -229,6 +293,41 @@ button:active {
 
   .overlay {
     inset: 52px 0 0;
+  }
+
+  .score-compare-nav {
+    max-height: 120px;
+    padding: 6px;
+    right: 6px;
+    top: 58px;
+    width: 132px;
+  }
+
+  .score-compare-title {
+    font-size: 12px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+  }
+
+  .score-compare-list {
+    gap: 4px;
+    max-height: 82px;
+  }
+
+  .score-compare-item {
+    padding: 4px 5px;
+  }
+
+  .score-compare-meta {
+    font-size: 10px;
+  }
+
+  .score-compare-distance {
+    font-size: 11px;
+  }
+
+  .score-compare-empty {
+    font-size: 11px;
   }
 
   .mobile-controls {

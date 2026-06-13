@@ -10,9 +10,14 @@ try {
     exit;
 }
 
-$type = isset($_GET['type']) ? $_GET['type'] : 'all';
-$page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
-$query = isset($_GET['query']) ? trim($_GET['query']) : '';
+$allowedTypes = ['day', 'week', 'month', 'all'];
+$type = isset($_GET['type']) && in_array($_GET['type'], $allowedTypes, true) ? $_GET['type'] : 'all';
+$page = isset($_GET['page']) && preg_match('/^[1-9][0-9]{0,5}$/', (string)$_GET['page']) ? intval($_GET['page']) : 1;
+$query = isset($_GET['query']) && is_string($_GET['query']) ? trim($_GET['query']) : '';
+if (mb_strlen($query, 'UTF-8') > 20 || preg_match('/[\x00-\x1F\x7F%_\\]/', $query)) {
+    echo json_encode(["code" => 400, "message" => "搜索关键词无效"]);
+    exit;
+}
 
 $rawPageSize = isset($_GET['pageSize']) ? $_GET['pageSize'] : '10';
 if ($rawPageSize === 'all') {
@@ -29,8 +34,8 @@ $cond = "";
 $params = [];
 
 if ($query !== '') {
-    $cond = "WHERE nickname LIKE ?";
-    $params[] = '%' . $query . '%';
+    $cond = "WHERE nickname LIKE ? ESCAPE '\\\\'";
+    $params[] = '%' . addcslashes($query, "\\%_") . '%';
 } else {
     switch ($type) {
         case 'day':

@@ -10,6 +10,10 @@
   var startButton = document.getElementById("startButton");
   var jumpButton = document.getElementById("jumpButton");
   var duckButton = document.getElementById("duckButton");
+  var scoreCompareList = document.getElementById("scoreCompareList");
+  var compareScores = [];
+  var nextCompareFetchAt = 0;
+  var lastCompareRenderedScore = -1;
 
   var W = canvas.width;
   var H = canvas.height;
@@ -41,7 +45,6 @@
   var bgmButton = document.getElementById("bgmButton");
    bgmButton.textContent = "BGM: " + bgmList[bgmIndex].name;
 
-  // 页面隐藏时暂停音乐，返回时恢复
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       bgm.pause();
@@ -50,7 +53,6 @@
     }
   });
 
-  // 页面即将离开时暂停音乐
   window.addEventListener("pagehide", function () {
     bgm.pause();
   });
@@ -95,8 +97,24 @@
     score: 0,
     obstacles: [],
     dust: [],
-    invincible: false
+    invincible: false,
+    token: "",
+    hashChallenge: null,
+    hashAnswers: [],
+    hashSolving: false,
+    nextHashChallengeAt: 0,
+    coordSamples: [],
+    nextCoordSampleAt: 0,
+    startedAt: 0,
+    endedAt: 0,
+    opStats: window.SeiaRunnerSecurity.createOperationStats()
   };
+
+  var antiCheat = window.SeiaRunnerSecurity.createAntiCheat({
+    game: game,
+    player: player,
+    getState: function () { return state; }
+  });
 
   function loadAssets() {
     assetKeys.forEach(function (key) {
@@ -136,6 +154,18 @@
     game.score = 0;
     game.obstacles = [];
     game.dust = [];
+    game.token = "";
+    game.hashChallenge = null;
+    game.hashAnswers = [];
+    game.hashSolving = false;
+    game.nextHashChallengeAt = 0;
+    game.coordSamples = [];
+    game.nextCoordSampleAt = 0;
+    game.startedAt = 0;
+    game.endedAt = 0;
+    nextCompareFetchAt = 0;
+    lastCompareRenderedScore = -1;
+    antiCheat.resetOperationStats();
     jumpBuffer = 0;
     spawnTimer = 0.65;
     lastTime = performance.now();
@@ -149,9 +179,36 @@
 
     playBgm();
     resetGame();
-    state = "playing";
-    overlay.classList.add("hidden");
-    requestAnimationFrame(loop);
+
+    fetch("api/game_start.php", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin"
+    })
+      .then(parseResponse)
+      .then(function (data) {
+        if (data.code !== 0 || !data.data || !data.data.token) {
+          throw new Error("invalid game token");
+        }
+
+        game.token = data.data.token;
+        game.hashChallenge = data.data.hashChallenge || null;
+        game.hashAnswers = [];
+        game.hashSolving = false;
+        game.nextHashChallengeAt = 0;
+        game.coordSamples = [];
+        game.nextCoordSampleAt = 0;
+        game.startedAt = Date.now();
+        game.endedAt = 0;
+        state = "playing";
+        overlay.classList.add("hidden");
+        fetchCompareScores(true);
+        requestAnimationFrame(loop);
+      })
+      .catch(function () {
+        overlayText.textContent = "游戏初始化失败，请刷新页面重试。";
+        overlay.classList.remove("hidden");
+      });
   }
 
   function playBgm() {
@@ -242,6 +299,7 @@
     }
 
     state = "gameover";
+    game.endedAt = Date.now();
     playDeathSound();
     bestScore = Math.max(bestScore, game.score);
     localStorage.setItem("seia-runner-best", String(bestScore));
@@ -259,7 +317,6 @@
   function playDeathSound() {
     deathSound.currentTime = 0;
     deathSound.play().catch(function () {
-      // If the browser blocks audio, the game can still end normally.
     });
   }
 
@@ -276,6 +333,12 @@
   }
 
   function spawnObstacle() {
+    var lastObstacle = game.obstacles.length > 0 ? game.obstacles[game.obstacles.length - 1] : null;
+    if (lastObstacle && lastObstacle.x + lastObstacle.w > W - 120) {
+      spawnTimer = 0.22;
+      return;
+    }
+
     var flying = game.score > 220 && Math.random() < 0.35;
     var useAlt = Math.random() < 0.5;
     var obstacle;
@@ -326,7 +389,10 @@
     }
 
     game.obstacles.push(obstacle);
-    spawnTimer = 0.92 + Math.random() * 0.78 - Math.min(game.score / 3200, 0.32);
+    var minInterval = 1.08;
+    var randomInterval = 0.64;
+    var difficultyReduction = Math.min(game.score / 4200, 0.22);
+    spawnTimer = minInterval + Math.random() * randomInterval - difficultyReduction;
   }
 
   function getFlyingY(lane) {
@@ -576,9 +642,77 @@
     updateScore();
   }
 
+  function fetchCompareScores(force) {
+    var now = Date.now();
+    if (!force && now < nextCompareFetchAt) {
+      return;
+    }
+
+    nextCompareFetchAt = now + 30000;
+    fetch("api/get_scores.php?type=all&page=1&pageSize=10", {
+      cache: "no-store",
+      credentials: "same-origin"
+    })
+      .then(parseResponse)
+      .then(function (data) {
+        if (data.code === 0 && Array.isArray(data.data)) {
+          compareScores = data.data.map(function (item) {
+            return {
+              nickname: String(item.nickname || "玩家"),
+              score: Number(item.score || 0)
+            };
+          }).filter(function (item) {
+            return item.score > 0;
+          });
+          lastCompareRenderedScore = -1;
+          updateScoreCompare();
+        }
+      })
+      .catch(function () {});
+  }
+
+  function updateScoreCompare() {
+    if (!scoreCompareList || lastCompareRenderedScore === game.score) {
+      return;
+    }
+
+    lastCompareRenderedScore = game.score;
+
+    if (compareScores.length === 0) {
+      lastCompareRenderedScore = -1;
+      scoreCompareList.innerHTML = '<div class="score-compare-empty">暂无排行榜数据</div>';
+      return;
+    }
+
+    scoreCompareList.innerHTML = "";
+    compareScores.forEach(function (item, index) {
+      var delta = game.score - item.score;
+      var row = document.createElement("div");
+      row.className = "score-compare-item" + (delta >= 0 ? " is-ahead" : " is-behind");
+
+      var meta = document.createElement("div");
+      meta.className = "score-compare-meta";
+      meta.textContent = "#" + (index + 1) + " " + item.nickname;
+
+      var distance = document.createElement("div");
+      distance.className = "score-compare-distance";
+      if (delta >= 0) {
+        distance.textContent = "领先 " + delta + " 分";
+      } else {
+        distance.textContent = "还差 " + Math.abs(delta) + " 分";
+      }
+
+      row.appendChild(meta);
+      row.appendChild(distance);
+      scoreCompareList.appendChild(row);
+    });
+  }
+
   function updateScore() {
     scoreEl.textContent = "SCORE: " + padScore(game.score || 0);
     bestEl.textContent = "HI " + padScore(bestScore);
+    updateScoreCompare();
+    fetchCompareScores(false);
   }
 
   function padScore(value) {
@@ -593,6 +727,8 @@
     var dt = Math.min((now - lastTime) / 1000, 0.033);
     lastTime = now;
     update(dt);
+    antiCheat.updateHashChallenge();
+    antiCheat.sampleCoordinates();
     drawFrame(dt);
 
     if (state === "playing") {
@@ -600,22 +736,13 @@
     }
   }
 
-  function isCheatModalOpen() {
-    return !cheatModal.classList.contains("hidden");
-  }
-
-  function isSubmitModalOpen() {
-    return !submitModal.classList.contains("hidden");
-  }
+  var securityUi = null;
 
   function isAnyModalOpen() {
-    return isCheatModalOpen() || isSubmitModalOpen();
+    return securityUi ? securityUi.isAnyModalOpen() : false;
   }
 
   window.addEventListener("keydown", function (event) {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
@@ -623,109 +750,107 @@
     if (event.code === "Space" || event.code === "ArrowUp") {
       event.preventDefault();
       playBgm();
+      antiCheat.recordOperation("keyDown");
+      antiCheat.recordOperation("jumpDown");
       input.jumpHeld = true;
       jump();
     } else if (event.code === "ArrowDown") {
       event.preventDefault();
       playBgm();
+      antiCheat.recordOperation("keyDown");
+      antiCheat.recordOperation("duckDown");
       setDuck(true);
     }
   });
 
   window.addEventListener("keyup", function (event) {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
     if (event.code === "Space" || event.code === "ArrowUp") {
       event.preventDefault();
+      antiCheat.recordOperation("keyUp");
+      antiCheat.recordOperation("jumpUp");
       input.jumpHeld = false;
       player.jumpHold = 0;
     } else if (event.code === "ArrowDown") {
       event.preventDefault();
+      antiCheat.recordOperation("keyUp");
+      antiCheat.recordOperation("duckUp");
       setDuck(false);
     }
   });
 
   canvas.addEventListener("pointerdown", function () {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
     playBgm();
+    antiCheat.recordOperation("pointerDown");
+    antiCheat.recordOperation("jumpDown");
     input.jumpHeld = true;
     jump();
   });
   canvas.addEventListener("pointerup", function () {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
+    antiCheat.recordOperation("pointerUp");
+    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   });
   canvas.addEventListener("pointercancel", function () {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
+    antiCheat.recordOperation("pointerUp");
+    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   });
 
   function pressJumpButton(event) {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
     event.preventDefault();
     playBgm();
+    antiCheat.recordOperation("buttonDown");
+    antiCheat.recordOperation("jumpDown");
     input.jumpHeld = true;
     jump();
   }
 
   function releaseJumpButton(event) {
-    if (state === "gameover") {
-      return;
-    }
     event.preventDefault();
+    antiCheat.recordOperation("buttonUp");
+    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   }
 
   function pressDuckButton(event) {
-    if (state === "gameover") {
-      return;
-    }
     if (isAnyModalOpen()) {
       return;
     }
 
     event.preventDefault();
     playBgm();
+    antiCheat.recordOperation("buttonDown");
+    antiCheat.recordOperation("duckDown");
     setDuck(true);
   }
 
   function releaseDuckButton(event) {
-    if (state === "gameover") {
-      return;
-    }
     event.preventDefault();
+    antiCheat.recordOperation("buttonUp");
+    antiCheat.recordOperation("duckUp");
     setDuck(false);
   }
 
@@ -746,157 +871,6 @@
     playBgm();
     startGame();
   });
-
-  var titleClicks = 0;
-  var cheatModal = document.getElementById("cheatModal");
-  var cheatInput = document.getElementById("cheatInput");
-  var cheatSubmit = document.getElementById("cheatSubmit");
-  var cheatCancel = document.getElementById("cheatCancel");
-  var titleEl = document.querySelector(".hud strong");
-
-  titleEl.style.cursor = "pointer";
-
-  titleEl.addEventListener("click", function () {
-    titleClicks += 1;
-
-    if (titleClicks >= 7 && !game.invincible) {
-      titleClicks = 0;
-      cheatModal.classList.remove("hidden");
-      cheatInput.value = "";
-      cheatInput.focus();
-    }
-  });
-
-  function closeCheatModal() {
-    cheatModal.classList.add("hidden");
-  }
-
-  var cheatCodes = [];
-
-  fetch("api/cheat_code.txt")
-    .then(function (res) { return res.text(); })
-    .then(function (text) {
-      var lines = text.split("\n");
-      lines.forEach(function (line) {
-        var code = line.trim().toUpperCase();
-        if (code !== "") {
-          cheatCodes.push(code);
-        }
-      });
-    })
-    .catch(function () {});
-
-  cheatSubmit.addEventListener("click", function () {
-    var inputCode = cheatInput.value.trim().toUpperCase();
-
-    if (inputCode !== "" && cheatCodes.indexOf(inputCode) !== -1) {
-      game.invincible = true;
-      closeCheatModal();
-      cheatSound.currentTime = 0;
-      cheatSound.play().catch(function () {});
-      showToast("作弊成功！");
-    } else {
-      document.getElementById("cheatError").classList.remove("hidden");
-    }
-  });
-
-  cheatCancel.addEventListener("click", closeCheatModal);
-
-  cheatInput.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      cheatSubmit.click();
-    } else if (event.key === "Escape") {
-      closeCheatModal();
-    }
-  });
-
-  cheatInput.addEventListener("input", function () {
-    document.getElementById("cheatError").classList.add("hidden");
-  });
-
-  // 成绩上传相关
-  var uploadScoreBtn = document.getElementById("uploadScoreBtn");
-  var submitModal = document.getElementById("submitModal");
-  var submitNickname = document.getElementById("submitNickname");
-  var submitMessage = document.getElementById("submitMessage");
-  var submitError = document.getElementById("submitError");
-  var submitScoreVal = document.getElementById("submitScoreVal");
-  var submitConfirm = document.getElementById("submitConfirm");
-  var submitCancel = document.getElementById("submitCancel");
-  var ipInfo = null;
-
-  // 页面加载时获取 IP 归属地信息
-  fetch("https://game.xcnahida.cn/api/v1/ip")
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      if (data.code === 0 && data.data) {
-        ipInfo = data;
-      }
-    })
-    .catch(function () {
-      // 获取失败则忽略，上传时 IP 和归属地为空
-    });
-
-  function getUserFingerprint() {
-    var comps = [];
-    comps.push(navigator.userAgent || "");
-    comps.push(navigator.language || "");
-    comps.push(screen.width + "x" + screen.height);
-    comps.push(screen.colorDepth);
-    comps.push(new Date().getTimezoneOffset());
-    comps.push(!!navigator.cookieEnabled);
-    comps.push(navigator.platform || "");
-    comps.push(navigator.hardwareConcurrency || 0);
-    if (navigator.deviceMemory) { comps.push(navigator.deviceMemory); }
-    var raw = comps.join("|");
-    return simpleHash(raw);
-  }
-
-  function simpleHash(str) {
-    var hash = 0;
-    for (var i = 0; i < str.length; i++) {
-      var ch = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + ch;
-      hash = hash | 0;
-    }
-    return Math.abs(hash).toString(16);
-  }
-
-  function getUserDevice() {
-    var ua = navigator.userAgent;
-    if (/Windows/i.test(ua)) return "Windows";
-    if (/Mac/i.test(ua)) return "Mac";
-    if (/Android/i.test(ua)) return "Android";
-    if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
-    if (/Linux/i.test(ua)) return "Linux";
-    return "Unknown";
-  }
-
-  function openSubmitModal() {
-    if (isCheatModalOpen()) return;
-
-    if (game.invincible) {
-      showToast("作弊模式下无法上传成绩");
-      return;
-    }
-
-    if (game.score === 0) {
-      showToast("没有成绩数据，请先开始游戏！");
-      return;
-    }
-
-    submitScoreVal.textContent = game.score;
-    submitNickname.value = localStorage.getItem("seia-runner-nick") || "";
-    submitMessage.value = localStorage.getItem("seia-runner-msg") || "";
-    submitError.classList.add("hidden");
-    submitModal.classList.remove("hidden");
-    submitNickname.focus();
-  }
-
-  function closeSubmitModal() {
-    submitModal.classList.add("hidden");
-  }
 
   var toastEl = document.getElementById("toast");
   var toastTimer = 0;
@@ -944,127 +918,12 @@
     return res.json();
   }
 
-  uploadScoreBtn.addEventListener("click", function () {
-    if (isAnyModalOpen()) return;
-    openSubmitModal();
-  });
-
-  submitCancel.addEventListener("click", function () {
-    closeSubmitModal();
-  });
-
-  submitConfirm.addEventListener("click", function () {
-    var nickname = submitNickname.value.trim();
-    var message = submitMessage.value.trim();
-
-    if (nickname === "") {
-      submitError.textContent = "请输入昵称";
-      submitError.classList.remove("hidden");
-      return;
-    }
-
-    if (nickname.length > 10) {
-      submitError.textContent = "昵称不能超过10个字";
-      submitError.classList.remove("hidden");
-      return;
-    }
-
-    if (message.length > 30) {
-      submitError.textContent = "留言不能超过30个字";
-      submitError.classList.remove("hidden");
-      return;
-    }
-
-    submitConfirm.disabled = true;
-    submitConfirm.textContent = "提交中...";
-    submitError.classList.add("hidden");
-
-    var formData = new URLSearchParams();
-    formData.append("nickname", nickname);
-    formData.append("message", message);
-    formData.append("score", String(game.score));
-    formData.append("ip_addr", ipInfo ? ipInfo.data.addr || "" : "");
-    formData.append("device", getUserDevice());
-    formData.append("fingerprint", getUserFingerprint());
-
-    if (ipInfo && ipInfo.data) {
-      var locParts = [];
-      if (ipInfo.data.country) locParts.push(ipInfo.data.country);
-      if (ipInfo.data.province) locParts.push(ipInfo.data.province);
-      formData.append("location", locParts.join("·"));
-    } else {
-      formData.append("location", "");
-    }
-
-    fetch("api/score_nonce.php", {
-      method: "GET",
-      cache: "no-store",
-      credentials: "same-origin"
-    })
-      .then(parseResponse)
-      .then(function (nonceData) {
-        if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
-          throw new Error("invalid score nonce");
-        }
-
-        formData.append("score_nonce", nonceData.data.nonce);
-
-        return fetch("api/submit_score.php", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-          },
-          body: formData.toString()
-        });
-      })
-      .then(parseResponse)
-      .then(function (data) {
-        submitConfirm.disabled = false;
-        submitConfirm.textContent = "提交";
-
-        if (data.code === 0) {
-          localStorage.setItem("seia-runner-nick", nickname);
-          localStorage.setItem("seia-runner-msg", message);
-          closeSubmitModal();
-          if (data.data.updated) {
-            showToast("成绩已更新！提高了 " + data.data.improved + " 分，当前排名第 " + data.data.rank + " 名");
-          } else if (data.data.oldScore) {
-            showToast(data.message);
-          } else {
-            showToast("上传成功！当前排名第 " + data.data.rank + " 名");
-          }
-        } else {
-          submitError.textContent = "提交成绩失败：" + (data.message || "未知错误");
-          submitError.classList.remove("hidden");
-        }
-      })
-      .catch(function (err) {
-        submitConfirm.disabled = false;
-        submitConfirm.textContent = "提交";
-        if (err.message !== "server 403 html response") {
-          submitError.textContent = "提交成绩失败：数据库出错，请稍后重试";
-          submitError.classList.remove("hidden");
-        }
-      });
-  });
-
-  // 提交弹窗内按 Enter / Esc 处理
-  submitNickname.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submitMessage.focus();
-    } else if (event.key === "Escape") {
-      closeSubmitModal();
-    }
-  });
-  submitMessage.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submitConfirm.click();
-    } else if (event.key === "Escape") {
-      closeSubmitModal();
-    }
+  securityUi = window.SeiaRunnerSecurity.initScoreSubmitAndCheat({
+    game: game,
+    antiCheat: antiCheat,
+    parseResponse: parseResponse,
+    showToast: showToast,
+    cheatSound: cheatSound
   });
 
   updateScore();
