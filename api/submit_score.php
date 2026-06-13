@@ -65,96 +65,106 @@ if ($message !== "") {
     }
 }
 
-$conn = getDB();
-
-// 查询是否已存在同指纹+同设备的记录
-$stmt = $conn->prepare(
-    "SELECT id, score FROM seia_score_rank WHERE fingerprint = ? AND device = ? LIMIT 1"
-);
-$stmt->bind_param("ss", $fingerprint, $device);
-$stmt->execute();
-$existing = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-if ($existing) {
-    $oldScore = intval($existing["score"]);
-    $oldId = intval($existing["id"]);
-
-    if ($score > $oldScore) {
-        // 新成绩更高，更新记录
-        $stmt = $conn->prepare(
-            "UPDATE seia_score_rank SET nickname = ?, message = ?, score = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
-        );
-        $stmt->bind_param("ssissi", $nickname, $message, $score, $device, $location, $oldId);
-        $stmt->execute();
-        $stmt->close();
-
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
-
-        echo json_encode([
-            "code" => 0,
-            "message" => "成绩已更新",
-            "data" => [
-                "id" => $oldId,
-                "rank" => $rank,
-                "updated" => true,
-                "improved" => $score - $oldScore
-            ]
-        ]);
-    } else {
-        // 已有更高记录，仅更新昵称和留言
-        $stmt = $conn->prepare(
-            "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
-        );
-        $stmt->bind_param("ssssi", $nickname, $message, $device, $location, $oldId);
-        $stmt->execute();
-        $stmt->close();
-
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $oldScore");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
-
-        echo json_encode([
-            "code" => 0,
-            "message" => "你有更高的成绩 (" . $oldScore . " 分)，当前排名第 " . $rank . " 名。",
-            "data" => [
-                "id" => $oldId,
-                "rank" => $rank,
-                "updated" => false,
-                "oldScore" => $oldScore
-            ]
-        ]);
-    }
-} else {
-    // 新记录，插入
-    $stmt = $conn->prepare(
-        "INSERT INTO seia_score_rank (nickname, message, score, ip_addr, device, location, fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    );
-    $stmt->bind_param("ssissss", $nickname, $message, $score, $ip_addr, $device, $location, $fingerprint);
-
-    if ($stmt->execute()) {
-        $rankId = $conn->insert_id;
-
-        $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
-        $rankRow = $rankResult->fetch_assoc();
-        $rank = intval($rankRow["runner_rank"]);
-
-        echo json_encode([
-            "code" => 0,
-            "message" => "上传成功",
-            "data" => [
-                "id" => $rankId,
-                "rank" => $rank,
-                "updated" => false
-            ]
-        ]);
-    } else {
-        echo json_encode(["code" => 500, "message" => "上传失败，请稍后再试"]);
-    }
-
-    $stmt->close();
+try {
+    $conn = getDB();
+} catch (Exception $e) {
+    echo json_encode(["code" => 500, "message" => "上传成绩出错，请稍后重试"]);
+    exit;
 }
 
-$conn->close();
+try {
+    // 查询是否已存在同指纹+同设备的记录
+    $stmt = $conn->prepare(
+        "SELECT id, score FROM seia_score_rank WHERE fingerprint = ? AND device = ? LIMIT 1"
+    );
+    $stmt->bind_param("ss", $fingerprint, $device);
+    $stmt->execute();
+    $existing = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($existing) {
+        $oldScore = intval($existing["score"]);
+        $oldId = intval($existing["id"]);
+
+        if ($score > $oldScore) {
+            // 新成绩更高，更新记录
+            $stmt = $conn->prepare(
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, score = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+            );
+            $stmt->bind_param("ssissi", $nickname, $message, $score, $device, $location, $oldId);
+            $stmt->execute();
+            $stmt->close();
+
+            $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
+            $rankRow = $rankResult->fetch_assoc();
+            $rank = intval($rankRow["runner_rank"]);
+
+            echo json_encode([
+                "code" => 0,
+                "message" => "成绩已更新",
+                "data" => [
+                    "id" => $oldId,
+                    "rank" => $rank,
+                    "updated" => true,
+                    "improved" => $score - $oldScore
+                ]
+            ]);
+        } else {
+            // 已有更高记录，仅更新昵称和留言
+            $stmt = $conn->prepare(
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+            );
+            $stmt->bind_param("ssssi", $nickname, $message, $device, $location, $oldId);
+            $stmt->execute();
+            $stmt->close();
+
+            $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $oldScore");
+            $rankRow = $rankResult->fetch_assoc();
+            $rank = intval($rankRow["runner_rank"]);
+
+            echo json_encode([
+                "code" => 0,
+                "message" => "你有更高的成绩 (" . $oldScore . " 分)，当前排名第 " . $rank . " 名。",
+                "data" => [
+                    "id" => $oldId,
+                    "rank" => $rank,
+                    "updated" => false,
+                    "oldScore" => $oldScore
+                ]
+            ]);
+        }
+    } else {
+        // 新记录，插入
+        $stmt = $conn->prepare(
+            "INSERT INTO seia_score_rank (nickname, message, score, ip_addr, device, location, fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        );
+        $stmt->bind_param("ssissss", $nickname, $message, $score, $ip_addr, $device, $location, $fingerprint);
+
+        if ($stmt->execute()) {
+            $rankId = $conn->insert_id;
+
+            $rankResult = $conn->query("SELECT COUNT(*) + 1 AS runner_rank FROM seia_score_rank WHERE score > $score");
+            $rankRow = $rankResult->fetch_assoc();
+            $rank = intval($rankRow["runner_rank"]);
+
+            echo json_encode([
+                "code" => 0,
+                "message" => "上传成功",
+                "data" => [
+                    "id" => $rankId,
+                    "rank" => $rank,
+                    "updated" => false
+                ]
+            ]);
+        } else {
+            echo json_encode(["code" => 500, "message" => "上传失败，请稍后再试"]);
+        }
+
+        $stmt->close();
+    }
+
+    $conn->close();
+} catch (mysqli_sql_exception $e) {
+    echo json_encode(["code" => 500, "message" => "上传成绩出错，请稍后重试"]);
+    exit;
+}

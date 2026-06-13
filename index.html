@@ -51,6 +51,32 @@
       </div>
     </div>
 
+    <div id="helpModal" class="help-modal hidden">
+      <div class="help-dialog">
+        <h2>玩法说明</h2>
+        <div class="help-content">
+          <p>圣娅快跑是一款《蔚蓝档案》横版跑酷同人小游戏。</p>
+          <p>😎穷玩车，富玩表，顶富得玩圣娅快跑。</p>
+          <p><strong>操作方式</strong></p>
+          <p>键盘：空格 / ↑ 跳跃（长按跳更高），↓ 下蹲</p>
+          <p>手机：点击跳跃/下蹲按钮</p>
+          <p><strong>障碍物</strong></p>
+          <p>地面上的是 <b>巧乐兹</b>，需要跳跃躲避；</p>
+          <p>空中飞行的是 <b>雪碧瓶</b>，需要下蹲或精准跳跃躲避。</p>
+          <p><strong>提示</strong></p>
+          <p>1. 在跳跃过程中按 ↓ 下蹲按钮，可以提前落地。</p>
+          <p>2. 游戏速度会越来越快，坚持得越久分数越高！</p>
+          <p>3. 游戏结束后，别忘了点击上传成绩按钮上传你的成绩。</p>
+          <p><strong>关于</strong></p>
+          <p>本项目已经开源在 GitHub 上，GitHub地址：<a href="https://github.com/VanillaNahida/seia-runner/" target="_blank">https://github.com/VanillaNahida/seia-runner/</a></p>
+          <p>感谢<a href="https://ottomate.games/" target="_blank">Ottomate</a>的<a href="https://ottomate.games/zxf" target="_blank">张雪峰跑酷</a>提供灵感。<br> </p>
+          <p>加入我的QQ群：<a href="https://xcnahida.cn/contact" target="_blank">点击加入</a></p>
+        </div>
+        <div class="help-buttons">
+          <button id="helpClose" type="button">我知道了</button>
+        </div>
+      </div>
+    </div>
     <div id="submitModal" class="submit-modal hidden">
       <div class="submit-dialog">
         <h2>上传成绩</h2>
@@ -70,6 +96,10 @@
     <div class="mobile-controls" aria-label="移动端控制">
       <button id="jumpButton" class="control-button jump-button" type="button">跳跃</button>
       <button id="duckButton" class="control-button duck-button" type="button">下蹲</button>
+    </div>
+    <div class="bgm-control">
+      <button id="bgmButton" class="control-button bgm-button" type="button">BGM: 和平的一天</button>
+      <button id="helpButton" class="control-button help-button" type="button">玩法说明</button>
     </div>
 
     <div class="footer-links">

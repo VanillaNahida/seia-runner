@@ -195,11 +195,14 @@ function loadData(type, page, pageSize, query) {
                 renderCards(data.data, data.total, data.page, data.pageSize);
                 renderPagination(data.total, data.pageSize, data.page);
                 updateNavActive();
+            } else {
+                document.getElementById('rankTableBody').innerHTML = '<tr><td colspan="7" class="rank-loading">' + (data.message || '查询失败，请稍后重试') + '</td></tr>';
+                document.getElementById('rankList').innerHTML = '<div class="rank-item no-data"><div>' + (data.message || '查询失败，请稍后重试') + '</div></div>';
             }
         })
         .catch(function() {
-            document.getElementById('rankTableBody').innerHTML = '<tr><td colspan="7" class="rank-loading">加载失败</td></tr>';
-            document.getElementById('rankList').innerHTML = '<div class="rank-item no-data"><div>加载失败</div></div>';
+            document.getElementById('rankTableBody').innerHTML = '<tr><td colspan="7" class="rank-loading">查询失败，请稍后重试</td></tr>';
+            document.getElementById('rankList').innerHTML = '<div class="rank-item no-data"><div>查询失败，请稍后重试</div></div>';
         });
 }
 

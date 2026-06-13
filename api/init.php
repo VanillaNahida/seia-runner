@@ -4,17 +4,18 @@ require_once __DIR__ . "/config.php";
 function getDB() {
     global $DB_HOST, $DB_USER, $DB_PASS, $DB_NAME;
 
-    // 先不指定数据库，连接后创建数据库（如果不存在）
-    $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS);
-    if ($conn->connect_error) {
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+    try {
+        $conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS);
+        $conn->query("CREATE DATABASE IF NOT EXISTS `$DB_NAME` DEFAULT CHARACTER SET utf8mb4");
+        $conn->select_db($DB_NAME);
+        $conn->set_charset("utf8mb4");
+    } catch (mysqli_sql_exception $e) {
         header("Content-Type: application/json; charset=utf-8");
-        echo json_encode(["code" => 500, "message" => "数据库连接失败: " . $conn->connect_error]);
+        echo json_encode(["code" => 500, "message" => "查询数据库出错，请稍后重试"]);
         exit;
     }
-
-    $conn->query("CREATE DATABASE IF NOT EXISTS `$DB_NAME` DEFAULT CHARACTER SET utf8mb4");
-    $conn->select_db($DB_NAME);
-    $conn->set_charset("utf8mb4");
 
     // 自动建表
     $sql = "CREATE TABLE IF NOT EXISTS seia_score_rank (

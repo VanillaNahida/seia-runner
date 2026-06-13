@@ -27,9 +27,19 @@
     jumpHeld: false,
     duckHeld: false
   };
-  var bgm = new Audio("assets/music/bgm_Peaceful_Day.mp3");
+  var bgmList = [
+    { name: "Peaceful_Day", file: "assets/music/bgm_Peaceful_Day.mp3" },
+    { name: "张雪峰老师我还记得你😭", file: "assets/music/bgm.mp3" },
+    { name: "熊大快跑BGM 1", file: "assets/music/bgm_xdkp.mp3" },
+    { name: "你说你有点难追", file: "assets/music/%E9%87%91%E7%94%9F%20-%20%E5%91%8A%E7%99%BD%E6%B0%94%E7%90%83%20%28%E5%8F%98%E9%80%9F%29.mp3" },
+    { name: "熊大快跑BGM 2", file: "assets/music/%E9%BA%A6%E4%B9%90%E8%BF%AAShop%20-%20%E7%86%8A%E5%A4%A7%E5%BF%AB%E8%B7%91BGM.mp3" }
+  ];
+  var bgmIndex = Number(localStorage.getItem("seia-runner-bgm-index") || 0);
+  var bgm = new Audio(bgmList[bgmIndex].file);
   bgm.loop = true;
   bgm.volume = 0.5;
+  var bgmButton = document.getElementById("bgmButton");
+   bgmButton.textContent = "BGM: " + bgmList[bgmIndex].name;
 
   // 页面隐藏时暂停音乐，返回时恢复
   document.addEventListener("visibilitychange", function () {
@@ -154,6 +164,43 @@
     });
   }
 
+  function switchBgm() {
+    bgm.pause();
+    bgmIndex = (bgmIndex + 1) % bgmList.length;
+    localStorage.setItem("seia-runner-bgm-index", String(bgmIndex));
+    bgm = new Audio(bgmList[bgmIndex].file);
+    bgm.loop = true;
+    bgm.volume = 0.5;
+    bgmButton.textContent = "BGM: " + bgmList[bgmIndex].name;
+    if (state === "playing") {
+      bgm.play().catch(function () {});
+    }
+  }
+
+  bgmButton.addEventListener("click", function (e) {
+    e.preventDefault();
+    switchBgm();
+  });
+
+  var helpButton = document.getElementById("helpButton");
+  var helpModal = document.getElementById("helpModal");
+  var helpClose = document.getElementById("helpClose");
+
+  helpButton.addEventListener("click", function (e) {
+    e.preventDefault();
+    helpModal.classList.remove("hidden");
+  });
+
+  helpClose.addEventListener("click", function () {
+    helpModal.classList.add("hidden");
+  });
+
+  helpModal.addEventListener("click", function (e) {
+    if (e.target === helpModal) {
+      helpModal.classList.add("hidden");
+    }
+  });
+
   function jump() {
     if (state === "ready" || state === "gameover") {
       startGame();
@@ -261,7 +308,7 @@
         y: getFlyingY(lane),
         w: 134,
         h: 76,
-        hitPad: 13,
+        hitPad: 16,
         lane: lane,
         speedMultiplier: speedMultiplier
       };
@@ -273,7 +320,7 @@
         y: groundY - (useAlt ? 112 : 118),
         w: useAlt ? 66 : 72,
         h: useAlt ? 134 : 144,
-        hitPad: 9,
+        hitPad: 11,
         speedMultiplier: 1
       };
     }
@@ -381,18 +428,18 @@
   function getPlayerHitBox() {
     if (player.ducking) {
       return {
-        x: player.x + 10,
-        y: player.y + 15,
-        w: player.w - 18,
-        h: player.h - 30
+        x: player.x + 13,
+        y: player.y + 18,
+        w: player.w - 24,
+        h: player.h - 36
       };
     }
 
     return {
-      x: player.x + 11,
-      y: player.y + 8,
-      w: player.w - 20,
-      h: player.h - 12
+      x: player.x + 14,
+      y: player.y + 11,
+      w: player.w - 26,
+      h: player.h - 18
     };
   }
 
@@ -909,14 +956,14 @@
             showToast("上传成功！当前排名第 " + data.data.rank + " 名");
           }
         } else {
-          submitError.textContent = data.message || "上传失败，请稍后再试";
+          submitError.textContent = "提交成绩失败：" + (data.message || "未知错误");
           submitError.classList.remove("hidden");
         }
       })
       .catch(function () {
         submitConfirm.disabled = false;
         submitConfirm.textContent = "提交";
-        submitError.textContent = "网络错误，请稍后再试";
+        submitError.textContent = "提交成绩失败：数据库出错，请稍后重试";
         submitError.classList.remove("hidden");
       });
   });
