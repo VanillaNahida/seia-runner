@@ -1,5 +1,70 @@
 <?php
 require_once __DIR__ . "/config.php";
+require_once __DIR__ . "/waf.php";
+
+runRequestWaf();
+
+function ensureScoreSession() {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+
+    session_set_cookie_params([
+        "httponly" => true,
+        "samesite" => "Strict",
+        "secure" => !empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off"
+    ]);
+    session_start();
+}
+
+function getScoreNonceTtl() {
+    $ttl = getenv("SCORE_NONCE_TTL");
+    if ($ttl === false || !ctype_digit($ttl)) {
+        return 30;
+    }
+
+    return max(5, min(3600, intval($ttl)));
+}
+
+function pruneScoreNonces() {
+    ensureScoreSession();
+
+    $now = time();
+    if (!isset($_SESSION["score_nonces"]) || !is_array($_SESSION["score_nonces"])) {
+        $_SESSION["score_nonces"] = [];
+        return;
+    }
+
+    foreach ($_SESSION["score_nonces"] as $nonce => $expiresAt) {
+        if (!is_int($expiresAt) || $expiresAt < $now) {
+            unset($_SESSION["score_nonces"][$nonce]);
+        }
+    }
+}
+
+function issueScoreNonce() {
+    pruneScoreNonces();
+
+    $nonce = bin2hex(random_bytes(32));
+    $_SESSION["score_nonces"][$nonce] = time() + getScoreNonceTtl();
+
+    return $nonce;
+}
+
+function consumeScoreNonce($nonce) {
+    pruneScoreNonces();
+
+    if (!is_string($nonce) || !preg_match('/^[a-f0-9]{64}$/', $nonce)) {
+        return false;
+    }
+
+    if (!isset($_SESSION["score_nonces"][$nonce])) {
+        return false;
+    }
+
+    unset($_SESSION["score_nonces"][$nonce]);
+    return true;
+}
 
 function getDB() {
     global $DB_HOST, $DB_USER, $DB_PASS, $DB_NAME;

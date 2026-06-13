@@ -918,7 +918,7 @@
     submitConfirm.textContent = "提交中...";
     submitError.classList.add("hidden");
 
-    var formData = new FormData();
+    var formData = new URLSearchParams();
     formData.append("nickname", nickname);
     formData.append("message", message);
     formData.append("score", String(game.score));
@@ -935,10 +935,28 @@
       formData.append("location", "");
     }
 
-    fetch("api/submit_score.php", {
-      method: "POST",
-      body: formData
+    fetch("api/score_nonce.php", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin"
     })
+      .then(function (res) { return res.json(); })
+      .then(function (nonceData) {
+        if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
+          throw new Error("invalid score nonce");
+        }
+
+        formData.append("score_nonce", nonceData.data.nonce);
+
+        return fetch("api/submit_score.php", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+          },
+          body: formData.toString()
+        });
+      })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         submitConfirm.disabled = false;

@@ -77,7 +77,7 @@ $DB_NAME = "seia_runner";
 
 ## 安全配置
 
-`api/.htaccess` 已禁止直接访问 `config.php`、`init.php`、`cheat_code.txt` 等敏感文件。如果使用 Nginx，需手动添加对应的 deny 规则。
+`api/.htaccess` 已禁止直接访问 `config.php`、`init.php`、`waf.php` 等内部文件。如果使用 Nginx，需将 `api/nginx-protection.conf` 中的规则加入对应的 server 配置，防止内部 API 文件和 WAF 规则文件被直接访问。
 
 # 项目结构
 
@@ -87,8 +87,12 @@ seia-runner/
 │   ├── .htaccess           # 安全规则
 │   ├── config.php          # 数据库配置
 │   ├── init.php            # 数据库初始化 + 敏感词检测
+│   ├── score_nonce.php     # 成绩提交一次性 nonce 签发接口
 │   ├── submit_score.php    # 成绩提交接口
-│   └── get_scores.php      # 排行榜查询接口
+│   ├── get_scores.php      # 排行榜查询接口
+│   ├── waf.php             # 请求 WAF 入口
+│   ├── waf_rules/          # WAF 规则文件
+│   └── nginx-protection.conf # Nginx 安全规则示例
 ├── assets/                 # 静态资源
 │   ├── audio/              # 音效
 │   ├── img/                # 图片素材
