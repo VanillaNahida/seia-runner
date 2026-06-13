@@ -4,6 +4,98 @@ require_once __DIR__ . "/waf.php";
 
 runRequestWaf();
 
+function isScoreDebugModeEnabled() {
+    return defined("SCORE_DEBUG_MODE") && SCORE_DEBUG_MODE === true;
+}
+
+function writeScoreDebugLog($event, $context = []) {
+    if (!isScoreDebugModeEnabled()) {
+        return;
+    }
+
+    $dir = defined("SCORE_DEBUG_LOG_DIR") ? SCORE_DEBUG_LOG_DIR : (__DIR__ . "/debug_logs");
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        error_log("Failed to create score debug log directory: " . $dir);
+        return;
+    }
+
+    $entry = [
+        "time" => date("c"),
+        "event" => $event,
+        "ip" => $_SERVER["REMOTE_ADDR"] ?? "",
+        "method" => $_SERVER["REQUEST_METHOD"] ?? "",
+        "uri" => $_SERVER["REQUEST_URI"] ?? "",
+        "context" => $context
+    ];
+
+    $path = rtrim($dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "score-debug-" . date("Y-m-d") . ".log";
+    file_put_contents($path, json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+function debugValueState($value) {
+    if ($value === null) {
+        return "null";
+    }
+
+    if (is_array($value)) {
+        return "array:" . count($value);
+    }
+
+    if (is_string($value)) {
+        return "string:" . strlen($value);
+    }
+
+    if (is_int($value)) {
+        return "int:" . $value;
+    }
+
+    if (is_bool($value)) {
+        return $value ? "bool:true" : "bool:false";
+    }
+
+    return gettype($value);
+}
+
+function summarizeStatsJson($rawStats) {
+    if (!is_string($rawStats) || $rawStats === "") {
+        return null;
+    }
+
+    $stats = json_decode($rawStats, true);
+    if (!is_array($stats)) {
+        return null;
+    }
+
+    $summary = [];
+    foreach ($stats as $key => $value) {
+        $summary[$key] = is_int($value) ? $value : debugValueState($value);
+    }
+
+    return $summary;
+}
+
+function getClientValidationDebugContext($encryptedPayload, $clientElapsedMs, $clientStartedAt, $clientEndedAt, $rawOperationStats, $operationStats, $operationStatsDigest, $operationStatsJsonError, $rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $runtimeStatsJsonError, $rawHashAnswers, $hashAnswers, $hashAnswersJsonError) {
+    return [
+        "payload_keys" => is_array($encryptedPayload) ? array_keys($encryptedPayload) : [],
+        "client_elapsed_ms" => debugValueState($clientElapsedMs),
+        "client_started_at" => debugValueState($clientStartedAt),
+        "client_ended_at" => debugValueState($clientEndedAt),
+        "operation_stats_raw" => debugValueState($rawOperationStats),
+        "operation_stats" => debugValueState($operationStats),
+        "operation_stats_values" => summarizeStatsJson($rawOperationStats),
+        "operation_stats_digest" => debugValueState($operationStatsDigest),
+        "runtime_stats_raw" => debugValueState($rawRuntimeStats),
+        "runtime_stats" => debugValueState($runtimeStats),
+        "runtime_stats_values" => summarizeStatsJson($rawRuntimeStats),
+        "runtime_stats_digest" => debugValueState($runtimeStatsDigest),
+        "hash_answers_raw" => debugValueState($rawHashAnswers),
+        "hash_answers" => debugValueState($hashAnswers),
+        "operation_stats_json_error" => $operationStatsJsonError,
+        "runtime_stats_json_error" => $runtimeStatsJsonError,
+        "hash_answers_json_error" => $hashAnswersJsonError
+    ];
+}
+
 function ensureScoreSession() {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
