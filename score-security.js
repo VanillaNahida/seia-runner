@@ -231,7 +231,7 @@
   function getUserDevice() {
     var ua = navigator.userAgent;
     if (/Windows/i.test(ua)) return "Windows";
-    if (/Mac/i.test(ua)) return "Mac";
+    if (/Mac/i.test(ua)) return "MacOS";
     if (/Android/i.test(ua)) return "Android";
     if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
     if (/Linux/i.test(ua)) return "Linux";
