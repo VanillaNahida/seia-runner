@@ -235,6 +235,9 @@
     if (/Android/i.test(ua)) return "Android";
     if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
     if (/Linux/i.test(ua)) return "Linux";
+    if (/OpenHarmony/i.test(ua)) return "HarmonyOS NEXT";
+    if (/HarmonyOS/i.test(ua)) return "HarmonyOS";
+    if (/ArkWeb/i.test(ua)) return "HarmonyOS";
     return "Unknown";
   }
 
