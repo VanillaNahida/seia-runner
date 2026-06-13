@@ -117,16 +117,16 @@ function parseClientTimestampMs($value) {
     return intval($value);
 }
 
-function getOperationStatInt($stats, $key) {
+function getStatInt($stats, $key, $max = 3600000) {
     if (!isset($stats[$key]) || !is_int($stats[$key])) {
         return null;
     }
 
-    return ($stats[$key] >= 0 && $stats[$key] <= 100000) ? $stats[$key] : null;
+    return ($stats[$key] >= 0 && $stats[$key] <= $max) ? $stats[$key] : null;
 }
 
 function parseOperationStats($value) {
-    if (!is_string($value) || $value === "" || strlen($value) > 512) {
+    if (!is_string($value) || $value === "" || strlen($value) > 2048) {
         return null;
     }
 
@@ -135,13 +135,59 @@ function parseOperationStats($value) {
         return null;
     }
 
-    $keys = [
-        "jumpDown", "jumpUp", "duckDown", "duckUp", "keyDown", "keyUp",
-        "pointerDown", "pointerUp", "buttonDown", "buttonUp", "firstOffsetMs", "lastOffsetMs"
+    $limits = [
+        "jumpDown" => 1000000,
+        "jumpUp" => 1000000,
+        "duckDown" => 1000000,
+        "duckUp" => 1000000,
+        "keyDown" => 1000000,
+        "keyUp" => 1000000,
+        "pointerDown" => 1000000,
+        "pointerUp" => 1000000,
+        "buttonDown" => 1000000,
+        "buttonUp" => 1000000,
+        "firstOffsetMs" => 3600000,
+        "lastOffsetMs" => 3600000
     ];
 
-    foreach ($keys as $key) {
-        $value = getOperationStatInt($stats, $key);
+    foreach ($limits as $key => $max) {
+        $value = getStatInt($stats, $key, $max);
+        if ($value === null) {
+            return null;
+        }
+        $stats[$key] = $value;
+    }
+
+    return $stats;
+}
+
+function parseRuntimeStats($value) {
+    if (!is_string($value) || $value === "" || strlen($value) > 2048) {
+        return null;
+    }
+
+    $stats = json_decode($value, true);
+    if (!is_array($stats)) {
+        return null;
+    }
+
+    $limits = [
+        "frameCount" => 1000000,
+        "totalFrameMs" => 7200000,
+        "maxFrameMs" => 300000,
+        "longFrames" => 1000000,
+        "hiddenMs" => 3600000,
+        "visibilityChanges" => 100000,
+        "blurCount" => 100000,
+        "focusCount" => 100000,
+        "resizeCount" => 100000,
+        "suspiciousClockSkips" => 100000,
+        "minScore" => 999999,
+        "maxScore" => 999999
+    ];
+
+    foreach ($limits as $key => $max) {
+        $value = getStatInt($stats, $key, $max);
         if ($value === null) {
             return null;
         }
@@ -158,6 +204,20 @@ function parseJsonArrayPost($value, $maxBytes) {
 
     $decoded = json_decode($value, true);
     return is_array($decoded) ? $decoded : null;
+}
+
+function getDigestPayload($payload, $key, $maxBytes) {
+    $value = getStrictPayloadString($payload, $key, $maxBytes);
+    if ($value === null) {
+        return [null, null];
+    }
+
+    $digest = getStrictPayloadString($payload, $key . "_digest", 64);
+    if ($digest === null || !is_string($digest) || !preg_match('/^[a-f0-9]{64}$/', $digest)) {
+        return [$value, null];
+    }
+
+    return [$value, $digest];
 }
 
 function getArrayInt($item, $key, $min, $max) {
@@ -182,12 +242,12 @@ function isValidHashAnswers($answers, $session, $elapsedMs) {
         return false;
     }
 
-    if (!is_array($answers)) {
+    if (!is_array($answers) || count($answers) > 3600) {
         return false;
     }
 
-    $expectedMin = max(1, intval(floor($elapsedMs / $intervalMs)) - 1);
-    if (count($answers) < $expectedMin || count($answers) > 3600) {
+    $expectedMin = max(0, intval(floor($elapsedMs / $intervalMs)) - 1);
+    if (count($answers) < $expectedMin) {
         return false;
     }
 
@@ -223,60 +283,38 @@ function isValidHashAnswers($answers, $session, $elapsedMs) {
     return true;
 }
 
-function isValidCoordinateSamples($samples, $score, $elapsedMs) {
-    if (!is_array($samples)) {
-        return false;
+function getExpectedScoreForElapsed($elapsedMs) {
+    $elapsed = max(0, floatval($elapsedMs) / 1000);
+    $timeToCap = (720 - 410) / 7.5;
+
+    if ($elapsed <= $timeToCap) {
+        $distance = 410 * $elapsed + 0.5 * 7.5 * $elapsed * $elapsed;
+    } else {
+        $distanceToCap = 410 * $timeToCap + 0.5 * 7.5 * $timeToCap * $timeToCap;
+        $distance = $distanceToCap + 720 * ($elapsed - $timeToCap);
     }
 
-    $expectedMin = max(2, intval(floor($elapsedMs / 250)) - 4);
-    if (count($samples) < min($expectedMin, 20) || count($samples) > 300) {
-        return false;
-    }
-
-    $lastT = -1;
-    $lastScore = -1;
-    foreach ($samples as $sample) {
-        if (!is_array($sample)) {
-            return false;
-        }
-
-        $t = getArrayInt($sample, "t", 0, 3600000);
-        $x = getArrayInt($sample, "x", 0, 900);
-        $y = getArrayInt($sample, "y", -100, 400);
-        $vy = getArrayInt($sample, "vy", -2500, 4500);
-        $grounded = getArrayInt($sample, "grounded", 0, 1);
-        $ducking = getArrayInt($sample, "ducking", 0, 1);
-        $sampleScore = getArrayInt($sample, "score", 0, 999999);
-        if ($t === null || $x === null || $y === null || $vy === null || $grounded === null || $ducking === null || $sampleScore === null) {
-            return false;
-        }
-
-        if ($t <= $lastT || $t > $elapsedMs + 1000 || $sampleScore < $lastScore || $sampleScore > $score + 80) {
-            return false;
-        }
-
-        if ($x < 90 || $x > 125 || $y < -120 || $y > 220) {
-            return false;
-        }
-
-        if ($grounded === 1) {
-            $groundY = $ducking === 1 ? 193 : 152;
-            if (abs($y - $groundY) > 8 || abs($vy) > 80) {
-                return false;
-            }
-        }
-
-        $lastT = $t;
-        $lastScore = $sampleScore;
-    }
-
-    return true;
+    return intval(floor($distance / 10));
 }
 
-function isValidClientProofs($session, $score, $elapsedMs, $rawOperationStats, $operationStats, $hashAnswers, $coordSamples) {
-    return isValidOperationStats($rawOperationStats, $operationStats, $session, $score, $elapsedMs)
-        && isValidHashAnswers($hashAnswers, $session, $elapsedMs)
-        && isValidCoordinateSamples($coordSamples, $score, $elapsedMs);
+function isValidClientProofs($session, $score, $elapsedMs, $rawOperationStats, $operationStats, $operationStatsDigest, $rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $hashAnswers, &$failureReason = null) {
+    if (!isValidOperationStats($rawOperationStats, $operationStats, $operationStatsDigest, $session, $score, $elapsedMs)) {
+        $failureReason = "操作统计校验失败，请用正常按键或按钮完成游戏";
+        return false;
+    }
+
+    if (!isValidRuntimeStats($rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $session, $score, $elapsedMs)) {
+        $failureReason = "运行环境校验失败，请保持页面前台运行并重新开始游戏";
+        return false;
+    }
+
+    if (!isValidHashAnswers($hashAnswers, $session, $elapsedMs)) {
+        $failureReason = "计算证明校验失败，请刷新页面后重试";
+        return false;
+    }
+
+    $failureReason = null;
+    return true;
 }
 
 function getOperationStatsDigest($rawStats, $session, $score, $elapsedMs) {
@@ -288,12 +326,55 @@ function getOperationStatsDigest($rawStats, $session, $score, $elapsedMs) {
     return hash_hmac("sha256", $score . "|" . $elapsedMs . "|" . $rawStats, $salt);
 }
 
-function isValidOperationStats($rawStats, $stats, $session, $score, $elapsedMs) {
-    if (getOperationStatsDigest($rawStats, $session, $score, $elapsedMs) === null) {
+function getRuntimeStatsDigest($rawStats, $session, $score, $elapsedMs) {
+    $salt = $session["proof_salt"] ?? "";
+    if (!is_string($salt) || !preg_match('/^[a-f0-9]{32}$/', $salt)) {
+        return null;
+    }
+
+    return hash_hmac("sha256", "runtime|" . $score . "|" . $elapsedMs . "|" . $rawStats, $salt);
+}
+
+function isValidRuntimeStats($rawStats, $stats, $digest, $session, $score, $elapsedMs) {
+    $expectedDigest = getRuntimeStatsDigest($rawStats, $session, $score, $elapsedMs);
+    if ($expectedDigest === null || !is_string($digest) || !hash_equals($expectedDigest, $digest)) {
+        return false;
+    }
+
+    if ($stats["frameCount"] < 1 || $stats["frameCount"] > 1000000) {
+        return false;
+    }
+
+    if ($stats["totalFrameMs"] < 0 || $stats["totalFrameMs"] > 7200000 || $stats["maxFrameMs"] > 300000) {
+        return false;
+    }
+
+    if ($stats["suspiciousClockSkips"] > 30) {
+        return false;
+    }
+
+    if ($stats["maxScore"] < 0 || $stats["maxScore"] > $score + 120 || $stats["minScore"] < 0 || $stats["minScore"] > $score) {
+        return false;
+    }
+
+    if ($score >= 200 && $stats["maxScore"] < 1) {
+        return false;
+    }
+
+    return true;
+}
+
+function isValidOperationStats($rawStats, $stats, $digest, $session, $score, $elapsedMs) {
+    $expectedDigest = getOperationStatsDigest($rawStats, $session, $score, $elapsedMs);
+    if ($expectedDigest === null || !is_string($digest) || !hash_equals($expectedDigest, $digest)) {
         return false;
     }
 
     if ($stats["lastOffsetMs"] < $stats["firstOffsetMs"] || $stats["lastOffsetMs"] > $elapsedMs + 1000) {
+        return false;
+    }
+
+    if ($stats["firstOffsetMs"] > 0 && $stats["firstOffsetMs"] > $elapsedMs + 1000) {
         return false;
     }
 
@@ -302,15 +383,15 @@ function isValidOperationStats($rawStats, $stats, $session, $score, $elapsedMs) 
     $sourceTotal = $stats["keyDown"] + $stats["keyUp"] + $stats["pointerDown"] + $stats["pointerUp"] + $stats["buttonDown"] + $stats["buttonUp"];
     $totalOps = $jumpTotal + $duckTotal;
 
-    if ($score >= 80 && $totalOps < 1) {
+    if ($score >= 200 && $totalOps < 1) {
         return false;
     }
 
-    if (abs($stats["jumpDown"] - $stats["jumpUp"]) > 2 || abs($stats["duckDown"] - $stats["duckUp"]) > 2) {
+    if (abs($stats["jumpDown"] - $stats["jumpUp"]) > max(3, $stats["jumpDown"]) || abs($stats["duckDown"] - $stats["duckUp"]) > max(3, $stats["duckDown"])) {
         return false;
     }
 
-    return $sourceTotal >= $totalOps && $sourceTotal <= $totalOps + 4;
+    return $sourceTotal >= $totalOps && $sourceTotal <= $totalOps + 8;
 }
 
 function isValidClientTimeline($startedAt, $endedAt, $elapsedMs) {
@@ -318,11 +399,7 @@ function isValidClientTimeline($startedAt, $endedAt, $elapsedMs) {
         return false;
     }
 
-    if ($endedAt <= $startedAt) {
-        return false;
-    }
-
-    return abs(($endedAt - $startedAt) - $elapsedMs) <= 1000;
+    return $startedAt > 0 && $endedAt > $startedAt && $elapsedMs >= 500 && $elapsedMs <= 3600000;
 }
 
 function enforceScoreRateLimit($fingerprint, $ipAddr) {
@@ -348,7 +425,7 @@ function enforceScoreRateLimit($fingerprint, $ipAddr) {
     }));
 
     if (count($window) >= 5) {
-        echo json_encode(["code" => 429, "message" => "Too many submissions, please try again later"]);
+        echo json_encode(["code" => 429, "message" => "提交过于频繁，请稍后再试"]);
         exit;
     }
 
@@ -406,12 +483,19 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
 $scoreNonce = getStrictPostString("score_nonce", 64);
 if ($scoreNonce === null) {
+    writeScoreDebugLog("score_submit_rejected", ["reason" => "score_nonce 包含非法字符"]);
     echo json_encode(["code" => 400, "message" => "请求参数包含非法字符"]);
     exit;
 }
 
 $encryptedPayload = getEncryptedPostPayload($scoreNonce);
 if ($encryptedPayload === null) {
+    writeScoreDebugLog("score_submit_rejected", [
+        "reason" => "成绩数据解密失败",
+        "score_nonce" => debugValueState($scoreNonce),
+        "score_iv" => debugValueState(getStrictPostString("score_iv", 32)),
+        "score_payload" => debugValueState(getStrictPostString("score_payload", 262144))
+    ]);
     echo json_encode(["code" => 400, "message" => "成绩数据解密失败，请刷新页面重试"]);
     exit;
 }
@@ -428,14 +512,30 @@ $gameToken   = getStrictPayloadString($encryptedPayload, "game_token", 64);
 $clientElapsedMs = parseClientElapsedMs(getStrictPayloadString($encryptedPayload, "client_elapsed_ms", 7));
 $clientStartedAt = parseClientTimestampMs(getStrictPayloadString($encryptedPayload, "client_started_at", 13));
 $clientEndedAt = parseClientTimestampMs(getStrictPayloadString($encryptedPayload, "client_ended_at", 13));
-$rawOperationStats = getStrictPayloadString($encryptedPayload, "operation_stats", 512);
+list($rawOperationStats, $operationStatsDigest) = getDigestPayload($encryptedPayload, "operation_stats", 2048);
 $operationStats = parseOperationStats($rawOperationStats);
-$rawHashAnswers = getStrictPayloadString($encryptedPayload, "hash_answers", 65535);
-$hashAnswers = parseJsonArrayPost($rawHashAnswers, 65535);
-$rawCoordSamples = getStrictPayloadString($encryptedPayload, "coord_samples", 65535);
-$coordSamples = parseJsonArrayPost($rawCoordSamples, 65535);
+$operationStatsJsonError = $rawOperationStats === null ? null : json_last_error_msg();
+list($rawRuntimeStats, $runtimeStatsDigest) = getDigestPayload($encryptedPayload, "runtime_stats", 2048);
+$runtimeStats = parseRuntimeStats($rawRuntimeStats);
+$runtimeStatsJsonError = $rawRuntimeStats === null ? null : json_last_error_msg();
+$rawHashAnswers = getStrictPayloadString($encryptedPayload, "hash_answers", 262144);
+$hashAnswers = parseJsonArrayPost($rawHashAnswers, 262144);
+$hashAnswersJsonError = $rawHashAnswers === null ? null : json_last_error_msg();
 
-if ($nickname === null || $message === null || $rawScore === null || $device === null || $location === null || $fingerprint === null || $scoreNonce === null || $gameToken === null || $rawOperationStats === null || $rawHashAnswers === null || $rawCoordSamples === null) {
+if ($nickname === null || $message === null || $rawScore === null || $device === null || $location === null || $fingerprint === null || $scoreNonce === null || $gameToken === null || $rawOperationStats === null || $rawRuntimeStats === null || $rawHashAnswers === null) {
+    writeScoreDebugLog("score_submit_rejected", [
+        "reason" => "请求参数包含非法字符",
+        "nickname" => debugValueState($nickname),
+        "message" => debugValueState($message),
+        "score" => debugValueState($rawScore),
+        "device" => debugValueState($device),
+        "location" => debugValueState($location),
+        "fingerprint" => debugValueState($fingerprint),
+        "game_token" => debugValueState($gameToken),
+        "operation_stats_raw" => debugValueState($rawOperationStats),
+        "runtime_stats_raw" => debugValueState($rawRuntimeStats),
+        "hash_answers_raw" => debugValueState($rawHashAnswers)
+    ]);
     echo json_encode(["code" => 400, "message" => "请求参数包含非法字符"]);
     exit;
 }
@@ -466,11 +566,20 @@ if (!isSafeLocation($location)) {
 }
 
 if ($clientElapsedMs === null || !isValidClientTimeline($clientStartedAt, $clientEndedAt, $clientElapsedMs)) {
+    writeScoreDebugLog("score_submit_rejected", [
+        "reason" => "游戏时间轴参数无效",
+        "client_elapsed_ms" => debugValueState($clientElapsedMs),
+        "client_started_at" => debugValueState($clientStartedAt),
+        "client_ended_at" => debugValueState($clientEndedAt)
+    ]);
     echo json_encode(["code" => 400, "message" => "游戏时间轴参数无效"]);
     exit;
 }
 
-if ($operationStats === null || $hashAnswers === null || $coordSamples === null) {
+if ($operationStats === null || $operationStatsDigest === null || $runtimeStats === null || $runtimeStatsDigest === null || $hashAnswers === null) {
+    writeScoreDebugLog("score_submit_rejected", array_merge([
+        "reason" => "客户端校验参数无效"
+    ], getClientValidationDebugContext($encryptedPayload, $clientElapsedMs, $clientStartedAt, $clientEndedAt, $rawOperationStats, $operationStats, $operationStatsDigest, $operationStatsJsonError, $rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $runtimeStatsJsonError, $rawHashAnswers, $hashAnswers, $hashAnswersJsonError)));
     echo json_encode(["code" => 400, "message" => "客户端校验参数无效"]);
     exit;
 }
@@ -497,14 +606,28 @@ if ($message !== "") {
 }
 
 if (!consumeScoreNonce($scoreNonce)) {
-    echo json_encode(["code" => 403, "message" => "Score submission expired, please try again"]);
+    writeScoreDebugLog("score_submit_rejected", [
+        "reason" => "成绩提交已过期",
+        "score_nonce" => debugValueState($scoreNonce)
+    ]);
+    echo json_encode(["code" => 403, "message" => "成绩提交已过期，请重新上传"]);
     exit;
 }
 
-if (!consumeGameSessionForScore($gameToken, $score, $clientElapsedMs, function ($session) use ($rawOperationStats, $operationStats, $score, $clientElapsedMs, $hashAnswers, $coordSamples) {
-    return isValidClientProofs($session, $score, $clientElapsedMs, $rawOperationStats, $operationStats, $hashAnswers, $coordSamples);
-})) {
-    echo json_encode(["code" => 403, "message" => "成绩或操作统计校验失败，请正常完成一局游戏后再上传"]);
+$scoreFailureReason = null;
+if (!consumeGameSessionForScore($gameToken, $score, $clientElapsedMs, function ($session, &$proofReason = null) use ($rawOperationStats, $operationStats, $operationStatsDigest, $rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $score, $clientElapsedMs, $hashAnswers) {
+    return isValidClientProofs($session, $score, $clientElapsedMs, $rawOperationStats, $operationStats, $operationStatsDigest, $rawRuntimeStats, $runtimeStats, $runtimeStatsDigest, $hashAnswers, $proofReason);
+}, $scoreFailureReason)) {
+    writeScoreDebugLog("score_submit_rejected", [
+        "reason" => $scoreFailureReason ?: "成绩校验失败",
+        "score" => $score,
+        "client_elapsed_ms" => debugValueState($clientElapsedMs),
+        "game_token" => debugValueState($gameToken),
+        "operation_stats" => debugValueState($operationStats),
+        "runtime_stats" => debugValueState($runtimeStats),
+        "hash_answers" => debugValueState($hashAnswers)
+    ]);
+    echo json_encode(["code" => 403, "message" => $scoreFailureReason ?: "成绩校验失败，请重新开始游戏"]);
     exit;
 }
 
@@ -553,18 +676,24 @@ try {
                 ]
             ]);
         } else {
-            // 已有更高记录，不允许用低分覆盖最高成绩对应的提交信息
+            $stmt = $conn->prepare(
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+            );
+            $stmt->bind_param("ssssi", $nickname, $message, $device, $location, $oldId);
+            $stmt->execute();
+            $stmt->close();
+
             $rank = getRunnerRank($conn, $oldScore);
 
             echo json_encode([
                 "code" => 0,
-                "message" => "你有更高的成绩 (" . $oldScore . " 分)，当前排名第 " . $rank . " 名。本次低分提交不会覆盖排行榜信息。",
+                "message" => "提交信息已更新，保留最高成绩 " . $oldScore . " 分，当前排名第 " . $rank . " 名。",
                 "data" => [
                     "id" => $oldId,
                     "rank" => $rank,
                     "updated" => false,
                     "oldScore" => $oldScore,
-                    "keptRecord" => true
+                    "infoUpdated" => true
                 ]
             ]);
         }

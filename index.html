@@ -30,8 +30,11 @@
 
       <canvas id="game" width="960" height="360"></canvas>
 
-      <aside id="scoreCompareNav" class="score-compare-nav" aria-label="实时成绩对比">
-        <div class="score-compare-title">成绩距离</div>
+      <button id="scoreCompareButton" class="score-compare-toggle" type="button">成绩</button>
+      <aside id="scoreCompareNav" class="score-compare-nav hidden" aria-label="实时成绩对比">
+        <div class="score-compare-title">
+          <button id="scoreCompareClose" class="score-compare-close" type="button" aria-label="隐藏实时成绩">×</button>
+        </div>
         <div id="scoreCompareList" class="score-compare-list">
           <div class="score-compare-empty">开始游戏后显示与其他玩家的距离</div>
         </div>
