@@ -12,6 +12,7 @@
   var duckButton = document.getElementById("duckButton");
   var scoreCompareNav = document.getElementById("scoreCompareNav");
   var scoreCompareButton = document.getElementById("scoreCompareButton");
+  var scoreCompareClose = document.getElementById("scoreCompareClose");
   var scoreCompareList = document.getElementById("scoreCompareList");
   var scoreCompareEnabled = localStorage.getItem("seia-runner-score-compare-enabled") === "1";
   var compareScores = [];
@@ -88,7 +89,9 @@
     vy: 0,
     grounded: true,
     ducking: false,
-    jumpHold: 0
+    jumpHold: 0,
+    vaultTime: 0,
+    vaultDuration: 0.42
   };
 
   var jumpBuffer = 0;
@@ -102,15 +105,15 @@
     dust: [],
     invincible: false,
     token: "",
+    proofSalt: "",
     hashChallenge: null,
     hashAnswers: [],
     hashSolving: false,
     nextHashChallengeAt: 0,
-    coordSamples: [],
-    nextCoordSampleAt: 0,
     startedAt: 0,
     endedAt: 0,
-    opStats: window.SeiaRunnerSecurity.createOperationStats()
+    opStats: window.SeiaRunnerSecurity.createOperationStats(),
+    runtimeStats: window.SeiaRunnerSecurity.createRuntimeStats()
   };
 
   var antiCheat = window.SeiaRunnerSecurity.createAntiCheat({
@@ -158,14 +161,15 @@
     game.obstacles = [];
     game.dust = [];
     game.token = "";
+    game.proofSalt = "";
     game.hashChallenge = null;
     game.hashAnswers = [];
     game.hashSolving = false;
     game.nextHashChallengeAt = 0;
-    game.coordSamples = [];
-    game.nextCoordSampleAt = 0;
+    game.elapsedMs = 0;
     game.startedAt = 0;
     game.endedAt = 0;
+    game.runtimeStats = window.SeiaRunnerSecurity.createRuntimeStats();
     nextCompareFetchAt = 0;
     lastCompareRenderedScore = -1;
     antiCheat.resetOperationStats();
@@ -195,17 +199,19 @@
         }
 
         game.token = data.data.token;
+        game.proofSalt = data.data.proofSalt || "";
         game.hashChallenge = data.data.hashChallenge || null;
         game.hashAnswers = [];
         game.hashSolving = false;
         game.nextHashChallengeAt = 0;
-        game.coordSamples = [];
-        game.nextCoordSampleAt = 0;
+        game.elapsedMs = 0;
         game.startedAt = Date.now();
         game.endedAt = 0;
         state = "playing";
         overlay.classList.add("hidden");
-        fetchCompareScores(true);
+        if (scoreCompareEnabled) {
+          fetchCompareScores(true);
+        }
         requestAnimationFrame(loop);
       })
       .catch(function () {
@@ -239,8 +245,7 @@
 
   function applyScoreCompareVisibility() {
     scoreCompareNav.classList.toggle("hidden", !scoreCompareEnabled);
-    scoreCompareButton.textContent = "成绩条: " + (scoreCompareEnabled ? "开" : "关");
-    scoreCompareButton.classList.toggle("is-on", scoreCompareEnabled);
+    scoreCompareButton.classList.toggle("hidden", scoreCompareEnabled);
 
     if (!scoreCompareEnabled) {
       lastCompareRenderedScore = -1;
@@ -263,6 +268,11 @@
   });
 
   scoreCompareButton.addEventListener("click", function (e) {
+    e.preventDefault();
+    toggleScoreCompare();
+  });
+
+  scoreCompareClose.addEventListener("click", function (e) {
     e.preventDefault();
     toggleScoreCompare();
   });
@@ -305,6 +315,7 @@
     player.vy = jumpVelocity;
     player.grounded = false;
     player.jumpHold = maxJumpHold;
+    player.vaultTime = player.vaultDuration;
     jumpBuffer = 0;
     makeDust(player.x + 34, groundY - 8);
   }
@@ -440,6 +451,10 @@
 
     if (jumpBuffer > 0) {
       jumpBuffer -= dt;
+    }
+
+    if (player.vaultTime > 0) {
+      player.vaultTime = Math.max(0, player.vaultTime - dt);
     }
 
     if (input.jumpHeld && player.jumpHold > 0 && player.vy < 0 && !input.duckHeld) {
@@ -671,6 +686,10 @@
   }
 
   function fetchCompareScores(force) {
+    if (!scoreCompareEnabled) {
+      return;
+    }
+
     var now = Date.now();
     if (!force && now < nextCompareFetchAt) {
       return;
@@ -712,28 +731,74 @@
       return;
     }
 
+    var points = compareScores.map(function (item, index) {
+      return {
+        type: "player",
+        rank: index + 1,
+        nickname: item.nickname,
+        score: item.score,
+        delta: game.score - item.score
+      };
+    });
+    points.push({
+      type: "self",
+      rank: 0,
+      nickname: "我",
+      score: game.score,
+      delta: 0
+    });
+
+    var scores = points.map(function (point) {
+      return point.score;
+    });
+    var maxScore = Math.max.apply(null, scores.concat([1]));
+
+    points.sort(function (a, b) {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return a.type === "self" ? -1 : 1;
+    });
+
     scoreCompareList.innerHTML = "";
-    compareScores.forEach(function (item, index) {
-      var delta = game.score - item.score;
-      var row = document.createElement("div");
-      row.className = "score-compare-item" + (delta >= 0 ? " is-ahead" : " is-behind");
 
-      var meta = document.createElement("div");
-      meta.className = "score-compare-meta";
-      meta.textContent = "#" + (index + 1) + " " + item.nickname;
+    var map = document.createElement("div");
+    map.className = "score-compare-map";
 
-      var distance = document.createElement("div");
-      distance.className = "score-compare-distance";
-      if (delta >= 0) {
-        distance.textContent = "领先 " + delta + " 分";
+    var track = document.createElement("div");
+    track.className = "score-compare-track";
+
+    var fill = document.createElement("div");
+    fill.className = "score-compare-fill";
+    fill.style.height = Math.max(0, Math.min(100, (game.score / maxScore) * 100)) + "%";
+    track.appendChild(fill);
+    map.appendChild(track);
+
+    points.forEach(function (point) {
+      var top = Math.max(4, Math.min(96, ((maxScore - point.score) / maxScore) * 100));
+      var marker = document.createElement("div");
+      marker.className = "score-compare-marker" + (point.type === "self" ? " is-self" : point.delta >= 0 ? " is-ahead" : " is-behind");
+      marker.style.top = top + "%";
+
+      var dot = document.createElement("span");
+      dot.className = "score-compare-dot";
+
+      var label = document.createElement("span");
+      label.className = "score-compare-label";
+      if (point.type === "self") {
+        label.textContent = "我 · " + point.score + "分";
+      } else if (point.delta >= 0) {
+        label.textContent = "#" + point.rank + " " + point.nickname + " · 领先" + point.delta;
       } else {
-        distance.textContent = "还差 " + Math.abs(delta) + " 分";
+        label.textContent = "#" + point.rank + " " + point.nickname + " · 差" + Math.abs(point.delta);
       }
 
-      row.appendChild(meta);
-      row.appendChild(distance);
-      scoreCompareList.appendChild(row);
+      marker.appendChild(dot);
+      marker.appendChild(label);
+      map.appendChild(marker);
     });
+
+    scoreCompareList.appendChild(map);
   }
 
   function updateScore() {
@@ -754,9 +819,10 @@
 
     var dt = Math.min((now - lastTime) / 1000, 0.033);
     lastTime = now;
+    game.elapsedMs += Math.round(dt * 1000);
     update(dt);
+    antiCheat.recordFrame(dt);
     antiCheat.updateHashChallenge();
-    antiCheat.sampleCoordinates();
     drawFrame(dt);
 
     if (state === "playing") {
@@ -766,12 +832,32 @@
 
   var securityUi = null;
 
+  document.addEventListener("visibilitychange", function () {
+    antiCheat.recordRuntimeEvent(document.hidden ? "hidden" : "visible");
+  });
+
+  window.addEventListener("blur", function () {
+    antiCheat.recordRuntimeEvent("blur");
+  });
+
+  window.addEventListener("focus", function () {
+    antiCheat.recordRuntimeEvent("focus");
+  });
+
+  window.addEventListener("resize", function () {
+    antiCheat.recordRuntimeEvent("resize");
+  });
+
   function isAnyModalOpen() {
     return securityUi ? securityUi.isAnyModalOpen() : false;
   }
 
   window.addEventListener("keydown", function (event) {
     if (isAnyModalOpen()) {
+      return;
+    }
+
+    if (event.repeat) {
       return;
     }
 

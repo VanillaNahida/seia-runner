@@ -14,7 +14,28 @@
       buttonDown: 0,
       buttonUp: 0,
       firstAt: 0,
-      lastAt: 0
+      lastAt: 0,
+      firstElapsedMs: 0,
+      lastElapsedMs: 0
+    };
+  }
+
+  function createRuntimeStats() {
+    return {
+      frameCount: 0,
+      totalFrameMs: 0,
+      maxFrameMs: 0,
+      longFrames: 0,
+      hiddenMs: 0,
+      hiddenStartedAt: 0,
+      visibilityChanges: 0,
+      blurCount: 0,
+      focusCount: 0,
+      resizeCount: 0,
+      suspiciousClockSkips: 0,
+      minScore: 0,
+      maxScore: 0,
+      lastScore: 0
     };
   }
 
@@ -37,12 +58,110 @@
     return hex;
   }
 
+  function sha256FallbackHex(value) {
+    function rightRotate(n, x) {
+      return (x >>> n) | (x << (32 - n));
+    }
+
+    var mathPow = Math.pow;
+    var maxWord = mathPow(2, 32);
+    var lengthProperty = "length";
+    var i;
+    var j;
+    var result = "";
+    var words = [];
+    var asciiBitLength = value[lengthProperty] * 8;
+    var hash = [];
+    var k = [];
+    var primeCounter = 0;
+    var isComposite = {};
+
+    for (var candidate = 2; primeCounter < 64; candidate += 1) {
+      if (!isComposite[candidate]) {
+        for (i = 0; i < 313; i += candidate) {
+          isComposite[i] = candidate;
+        }
+        hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+        k[primeCounter] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        primeCounter += 1;
+      }
+    }
+
+    value += "\x80";
+    while (value[lengthProperty] % 64 - 56) {
+      value += "\x00";
+    }
+
+    for (i = 0; i < value[lengthProperty]; i += 1) {
+      j = value.charCodeAt(i);
+      if (j >> 8) {
+        return simpleHash(value);
+      }
+      words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words[lengthProperty]] = ((asciiBitLength / maxWord) | 0);
+    words[words[lengthProperty]] = asciiBitLength;
+
+    for (j = 0; j < words[lengthProperty];) {
+      var w = words.slice(j, j += 16);
+      var oldHash = hash.slice(0);
+
+      for (i = 0; i < 64; i += 1) {
+        var w15 = w[i - 15];
+        var w2 = w[i - 2];
+        var a = hash[0];
+        var e = hash[4];
+        var temp1 = hash[7]
+          + (rightRotate(6, e) ^ rightRotate(11, e) ^ rightRotate(25, e))
+          + ((e & hash[5]) ^ ((~e) & hash[6]))
+          + k[i]
+          + (w[i] = (i < 16) ? w[i] : (
+            w[i - 16]
+            + (rightRotate(7, w15) ^ rightRotate(18, w15) ^ (w15 >>> 3))
+            + w[i - 7]
+            + (rightRotate(17, w2) ^ rightRotate(19, w2) ^ (w2 >>> 10))
+          ) | 0);
+        var temp2 = (rightRotate(2, a) ^ rightRotate(13, a) ^ rightRotate(22, a))
+          + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+
+        hash = [(temp1 + temp2) | 0].concat(hash);
+        hash[4] = (hash[4] + temp1) | 0;
+      }
+
+      for (i = 0; i < 8; i += 1) {
+        hash[i] = (hash[i] + oldHash[i]) | 0;
+      }
+    }
+
+    for (i = 0; i < 8; i += 1) {
+      for (j = 3; j + 1; j -= 1) {
+        var b = (hash[i] >> (j * 8)) & 255;
+        result += ((b < 16) ? "0" : "") + b.toString(16);
+      }
+    }
+
+    return result;
+  }
+
   function sha256Hex(value) {
     if (!window.crypto || !window.crypto.subtle || !window.TextEncoder) {
-      return Promise.resolve(simpleHash(value));
+      return Promise.resolve(sha256FallbackHex(value));
     }
 
     return window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)).then(toHex);
+  }
+
+  function hmacSha256Hex(message, keyHex) {
+    if (!window.crypto || !window.crypto.subtle || !window.TextEncoder || !/^[a-f0-9]{32}$/i.test(keyHex || "")) {
+      return Promise.reject(new Error("crypto unavailable"));
+    }
+
+    var encoder = new TextEncoder();
+    return window.crypto.subtle.importKey("raw", encoder.encode(keyHex), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+      .then(function (key) {
+        return window.crypto.subtle.sign("HMAC", key, encoder.encode(message));
+      })
+      .then(toHex);
   }
 
   function createAntiCheat(options) {
@@ -52,6 +171,14 @@
 
     function resetOperationStats() {
       game.opStats = createOperationStats();
+      game.runtimeStats = createRuntimeStats();
+    }
+
+    function ensureRuntimeStats() {
+      if (!game.runtimeStats) {
+        game.runtimeStats = createRuntimeStats();
+      }
+      return game.runtimeStats;
     }
 
     function recordOperation(kind) {
@@ -60,13 +187,16 @@
       }
 
       var now = Date.now();
+      var elapsedMs = Math.max(0, Math.round(game.elapsedMs || (now - game.startedAt)));
       if (game.opStats[kind] !== undefined) {
         game.opStats[kind] += 1;
       }
       if (game.opStats.firstAt === 0) {
         game.opStats.firstAt = now;
+        game.opStats.firstElapsedMs = elapsedMs;
       }
       game.opStats.lastAt = now;
+      game.opStats.lastElapsedMs = elapsedMs;
     }
 
     function buildOperationPayload() {
@@ -82,18 +212,103 @@
         pointerUp: stats.pointerUp || 0,
         buttonDown: stats.buttonDown || 0,
         buttonUp: stats.buttonUp || 0,
-        firstOffsetMs: stats.firstAt > 0 ? Math.max(0, stats.firstAt - game.startedAt) : 0,
-        lastOffsetMs: stats.lastAt > 0 ? Math.max(0, stats.lastAt - game.startedAt) : 0
+        firstOffsetMs: stats.firstElapsedMs || 0,
+        lastOffsetMs: stats.lastElapsedMs || 0
       };
       return JSON.stringify(ordered);
+    }
+
+    function buildRuntimePayload() {
+      var stats = ensureRuntimeStats();
+      var hiddenMs = stats.hiddenMs || 0;
+      if (getState() === "playing" && stats.hiddenStartedAt > 0) {
+        hiddenMs += Math.max(0, Date.now() - stats.hiddenStartedAt);
+      }
+
+      return JSON.stringify({
+        frameCount: stats.frameCount || 0,
+        totalFrameMs: Math.round(stats.totalFrameMs || 0),
+        maxFrameMs: Math.round(stats.maxFrameMs || 0),
+        longFrames: stats.longFrames || 0,
+        hiddenMs: Math.round(hiddenMs),
+        visibilityChanges: stats.visibilityChanges || 0,
+        blurCount: stats.blurCount || 0,
+        focusCount: stats.focusCount || 0,
+        resizeCount: stats.resizeCount || 0,
+        suspiciousClockSkips: stats.suspiciousClockSkips || 0,
+        minScore: stats.minScore || 0,
+        maxScore: stats.maxScore || 0
+      });
+    }
+
+    function recordFrame(dt) {
+      if (getState() !== "playing") {
+        return;
+      }
+
+      var stats = ensureRuntimeStats();
+      var frameMs = Math.max(0, Math.round((dt || 0) * 1000));
+      stats.frameCount += 1;
+      stats.totalFrameMs += frameMs;
+      stats.maxFrameMs = Math.max(stats.maxFrameMs, frameMs);
+      if (frameMs > 80) {
+        stats.longFrames += 1;
+      }
+      if (game.score < stats.lastScore) {
+        stats.suspiciousClockSkips += 1;
+      }
+      stats.lastScore = game.score || 0;
+      stats.maxScore = Math.max(stats.maxScore, game.score || 0);
+      if (stats.minScore === 0 || (game.score > 0 && game.score < stats.minScore)) {
+        stats.minScore = game.score;
+      }
+    }
+
+    function recordRuntimeEvent(kind) {
+      if (getState() !== "playing") {
+        return;
+      }
+
+      var stats = ensureRuntimeStats();
+      if (kind === "hidden") {
+        stats.visibilityChanges += 1;
+        if (stats.hiddenStartedAt === 0) {
+          stats.hiddenStartedAt = Date.now();
+        }
+      } else if (kind === "visible") {
+        stats.visibilityChanges += 1;
+        if (stats.hiddenStartedAt > 0) {
+          stats.hiddenMs += Math.max(0, Date.now() - stats.hiddenStartedAt);
+          stats.hiddenStartedAt = 0;
+        }
+      } else if (kind === "blur") {
+        stats.blurCount += 1;
+      } else if (kind === "focus") {
+        stats.focusCount += 1;
+      } else if (kind === "resize") {
+        stats.resizeCount += 1;
+      }
     }
 
     function buildHashAnswersPayload() {
       return JSON.stringify(game.hashAnswers || []);
     }
 
-    function buildCoordSamplesPayload() {
-      return JSON.stringify(game.coordSamples || []);
+    function waitForProofs(timeoutMs) {
+      var startedAt = Date.now();
+
+      return new Promise(function (resolve) {
+        function check() {
+          if (!game.hashSolving || Date.now() - startedAt >= timeoutMs) {
+            resolve();
+            return;
+          }
+
+          setTimeout(check, 50);
+        }
+
+        check();
+      });
     }
 
     function solveHashChallenge(index, elapsedMs) {
@@ -145,7 +360,7 @@
         return;
       }
 
-      var elapsedMs = Date.now() - game.startedAt;
+      var elapsedMs = Math.max(0, Math.round(game.elapsedMs || (Date.now() - game.startedAt)));
       var intervalMs = game.hashChallenge.interval_ms || 1200;
       if (elapsedMs < game.nextHashChallengeAt || game.hashSolving) {
         return;
@@ -156,40 +371,16 @@
       solveHashChallenge(index, elapsedMs);
     }
 
-    function sampleCoordinates() {
-      if (game.startedAt <= 0) {
-        return;
-      }
-
-      var elapsedMs = Date.now() - game.startedAt;
-      if (elapsedMs < game.nextCoordSampleAt) {
-        return;
-      }
-
-      game.nextCoordSampleAt = elapsedMs + 250;
-      game.coordSamples.push({
-        t: elapsedMs,
-        x: Math.round(player.x),
-        y: Math.round(player.y),
-        vy: Math.round(player.vy),
-        grounded: player.grounded ? 1 : 0,
-        ducking: player.ducking ? 1 : 0,
-        score: game.score
-      });
-
-      if (game.coordSamples.length > 260) {
-        game.coordSamples.shift();
-      }
-    }
-
     return {
       resetOperationStats: resetOperationStats,
       recordOperation: recordOperation,
+      recordFrame: recordFrame,
+      recordRuntimeEvent: recordRuntimeEvent,
       updateHashChallenge: updateHashChallenge,
-      sampleCoordinates: sampleCoordinates,
       buildOperationPayload: buildOperationPayload,
+      buildRuntimePayload: buildRuntimePayload,
       buildHashAnswersPayload: buildHashAnswersPayload,
-      buildCoordSamplesPayload: buildCoordSamplesPayload
+      waitForProofs: waitForProofs
     };
   }
 
@@ -210,7 +401,7 @@
       return false;
     }
 
-    var elapsedMs = game.endedAt - game.startedAt;
+    var elapsedMs = Math.max(0, Math.round(game.elapsedMs || (game.endedAt - game.startedAt)));
     return elapsedMs >= 500 && elapsedMs <= 3600000;
   }
 
@@ -437,57 +628,71 @@
       submitConfirm.textContent = "提交中...";
       submitError.classList.add("hidden");
 
-      var scorePayload = {
-        nickname: nickname,
-        message: message,
-        score: String(game.score),
-        game_token: game.token,
-        client_started_at: String(game.startedAt),
-        client_ended_at: String(game.endedAt),
-        client_elapsed_ms: String(game.endedAt - game.startedAt),
-        operation_stats: antiCheat.buildOperationPayload(),
-        hash_answers: antiCheat.buildHashAnswersPayload(),
-        coord_samples: antiCheat.buildCoordSamplesPayload(),
-        ip_addr: ipInfo ? ipInfo.data.addr || "" : "",
-        device: getUserDevice(),
-        fingerprint: getUserFingerprint(),
-        location: ""
-      };
+      antiCheat.waitForProofs(800).then(function () {
+        var clientElapsedMs = String(Math.max(500, Math.round(game.elapsedMs || (game.endedAt - game.startedAt))));
+        var clientEndedAt = String(game.startedAt + Number(clientElapsedMs));
+        var operationStats = antiCheat.buildOperationPayload();
+        var runtimeStats = antiCheat.buildRuntimePayload();
 
-      if (ipInfo && ipInfo.data) {
-        var locParts = [];
-        if (ipInfo.data.country) locParts.push(ipInfo.data.country);
-        if (ipInfo.data.province) locParts.push(ipInfo.data.province);
-        scorePayload.location = locParts.join("·");
-      }
+        return Promise.all([
+          hmacSha256Hex(String(game.score) + "|" + clientElapsedMs + "|" + operationStats, game.proofSalt),
+          hmacSha256Hex("runtime|" + String(game.score) + "|" + clientElapsedMs + "|" + runtimeStats, game.proofSalt)
+        ]).then(function (digests) {
+          var scorePayload = {
+            nickname: nickname,
+            message: message,
+            score: String(game.score),
+            game_token: game.token,
+            client_started_at: String(game.startedAt),
+            client_ended_at: clientEndedAt,
+            client_elapsed_ms: clientElapsedMs,
+            operation_stats: operationStats,
+            operation_stats_digest: digests[0],
+            runtime_stats: runtimeStats,
+            runtime_stats_digest: digests[1],
+            hash_answers: antiCheat.buildHashAnswersPayload(),
+            ip_addr: ipInfo ? ipInfo.data.addr || "" : "",
+            device: getUserDevice(),
+            fingerprint: getUserFingerprint(),
+            location: ""
+          };
 
-      fetch("api/score_nonce.php", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin"
-      })
-        .then(parseResponse)
-        .then(function (nonceData) {
-          if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
-            throw new Error("invalid score nonce");
-          }
+        if (ipInfo && ipInfo.data) {
+          var locParts = [];
+          if (ipInfo.data.country) locParts.push(ipInfo.data.country);
+          if (ipInfo.data.province) locParts.push(ipInfo.data.province);
+          scorePayload.location = locParts.join("·");
+        }
 
-          return encryptScorePayload(scorePayload, nonceData.data.nonce).then(function (encrypted) {
-            var formData = new URLSearchParams();
-            formData.append("score_nonce", nonceData.data.nonce);
-            formData.append("score_iv", encrypted.iv);
-            formData.append("score_payload", encrypted.payload);
+        return fetch("api/score_nonce.php", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "same-origin"
+        })
+          .then(parseResponse)
+          .then(function (nonceData) {
+            if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
+              throw new Error("invalid score nonce");
+            }
 
-            return fetch("api/submit_score.php", {
-              method: "POST",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-              },
-              body: formData.toString()
+            return encryptScorePayload(scorePayload, nonceData.data.nonce).then(function (encrypted) {
+              var formData = new URLSearchParams();
+              formData.append("score_nonce", nonceData.data.nonce);
+              formData.append("score_iv", encrypted.iv);
+              formData.append("score_payload", encrypted.payload);
+
+              return fetch("api/submit_score.php", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+                },
+                body: formData.toString()
+              });
             });
           });
-        })
+        });
+      })
         .then(parseResponse)
         .then(function (data) {
           submitConfirm.disabled = false;
@@ -551,6 +756,7 @@
 
   window.SeiaRunnerSecurity = {
     createOperationStats: createOperationStats,
+    createRuntimeStats: createRuntimeStats,
     createAntiCheat: createAntiCheat,
     initScoreSubmitAndCheat: initScoreSubmitAndCheat
   };

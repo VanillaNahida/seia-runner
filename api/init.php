@@ -87,33 +87,39 @@ function issueGameSession() {
 
     $token = bin2hex(random_bytes(32));
     $challengeSeed = bin2hex(random_bytes(16));
+    $obstacleSeed = random_int(1, 2147483646);
     $challenge = [
         "seed" => $challengeSeed,
-        "difficulty" => 2,
+        "difficulty" => 1,
         "interval_ms" => 1200,
-        "max_nonce" => 200000
+        "max_nonce" => 50000
     ];
     $_SESSION["game_sessions"][$token] = [
         "started_at" => microtime(true),
         "proof_salt" => bin2hex(random_bytes(16)),
         "hash_challenge" => $challenge,
+        "obstacle_seed" => $obstacleSeed,
         "expires_at" => time() + 3600
     ];
 
     return [
         "token" => $token,
-        "hashChallenge" => $challenge
+        "proofSalt" => $_SESSION["game_sessions"][$token]["proof_salt"],
+        "hashChallenge" => $challenge,
+        "obstacleSeed" => $obstacleSeed
     ];
 }
 
-function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $operationProof = null) {
+function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $operationProof = null, &$failureReason = null) {
     pruneGameSessions();
+    $failureReason = "游戏会话无效，请重新开始游戏";
 
     if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/', $token)) {
         return false;
     }
 
     if (!isset($_SESSION["game_sessions"][$token]) || !is_array($_SESSION["game_sessions"][$token])) {
+        $failureReason = "游戏会话已过期或已提交过，请重新开始游戏";
         return false;
     }
 
@@ -121,31 +127,59 @@ function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $op
     unset($_SESSION["game_sessions"][$token]);
 
     $elapsed = microtime(true) - floatval($session["started_at"] ?? 0);
-    if ($elapsed < 0.5 || $elapsed > 3600) {
+    if ($elapsed < 0.5) {
+        $failureReason = "游戏时长过短，请正常完成一局游戏后再上传";
+        return false;
+    }
+
+    if ($elapsed > 3600) {
+        $failureReason = "游戏会话已超时，请重新开始游戏";
         return false;
     }
 
     $scoreElapsed = $elapsed;
     if ($clientElapsedMs !== null) {
         if (!is_int($clientElapsedMs) || $clientElapsedMs < 500 || $clientElapsedMs > 3600000) {
+            $failureReason = "游戏时长数据异常，请重新开始游戏";
             return false;
         }
 
         $clientElapsed = $clientElapsedMs / 1000;
         if ($clientElapsed > $elapsed + 2.0) {
+            $failureReason = "客户端游戏时长超过服务端记录，请刷新页面后重试";
+            return false;
+        }
+
+        if ($elapsed - $clientElapsed > 90.0) {
+            $failureReason = "成绩上传间隔过久，请在游戏结束后尽快上传";
             return false;
         }
         $scoreElapsed = $clientElapsed;
     }
 
-    if (is_callable($operationProof) && !$operationProof($session)) {
-        return false;
+    if (is_callable($operationProof)) {
+        $proofReason = null;
+        if (!$operationProof($session, $proofReason)) {
+            $failureReason = $proofReason ?: "客户端校验数据异常，请正常完成一局游戏后再上传";
+            return false;
+        }
     }
 
     $maxScore = calculateMaxLegitScore($scoreElapsed) + 120;
     $minScore = max(1, calculateMinLegitScore($scoreElapsed) - 120);
 
-    return $score >= $minScore && $score <= $maxScore;
+    if ($score < $minScore) {
+        $failureReason = "成绩低于当前游戏时长的合理范围，请重新开始游戏";
+        return false;
+    }
+
+    if ($score > $maxScore) {
+        $failureReason = "成绩超过当前游戏时长的合理范围，请正常完成一局游戏后再上传";
+        return false;
+    }
+
+    $failureReason = null;
+    return true;
 }
 
 function calculateMinLegitScore($elapsed) {

@@ -19,6 +19,12 @@ body {
   margin: 0;
   min-height: 100%;
   overflow: hidden;
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
 }
 
 .page-shell {
@@ -81,18 +87,38 @@ canvas {
   width: 100%;
 }
 
-.score-compare-nav {
+.score-compare-toggle {
   background: rgba(255, 253, 246, 0.94);
   border: 2px solid #28342d;
   border-radius: 8px;
   box-shadow: 0 8px 22px rgba(32, 42, 35, 0.14);
-  max-height: 236px;
+  color: #1b2f25;
+  font-size: 14px;
+  min-height: 34px;
+  min-width: 58px;
+  padding: 0 10px;
+  position: absolute;
+  right: 10px;
+  top: 72px;
+  z-index: 5;
+}
+
+.score-compare-toggle.hidden {
+  display: none;
+}
+
+.score-compare-nav {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  max-height: 300px;
   overflow: hidden;
   padding: 10px;
   position: absolute;
   right: 10px;
   top: 72px;
-  width: 176px;
+  width: 170px;
   z-index: 5;
 }
 
@@ -101,46 +127,129 @@ canvas {
 }
 
 .score-compare-title {
-  border-bottom: 1px solid #dde7e1;
+  align-items: center;
+  border-bottom: 0;
   color: #1b2f25;
+  display: flex;
   font-size: 15px;
   font-weight: 700;
+  justify-content: flex-end;
   margin-bottom: 8px;
   padding-bottom: 6px;
 }
 
-.score-compare-list {
-  display: grid;
-  gap: 6px;
-  max-height: 184px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.score-compare-item {
-  background: #ffffff;
-  border-left: 4px solid #c0392b;
-  border-radius: 5px;
-  padding: 6px 8px;
-}
-
-.score-compare-item.is-ahead {
-  border-left-color: #1f6f4a;
-}
-
-.score-compare-meta {
+.score-compare-close {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(40, 52, 45, 0.18);
+  border-radius: 6px;
   color: #5e665d;
-  font-size: 12px;
+  font-size: 18px;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0;
+}
+
+.score-compare-close:hover {
+  color: #c0392b;
+}
+
+.score-compare-list {
+  max-height: 248px;
   overflow: hidden;
+  padding: 4px 0;
+}
+
+.score-compare-map {
+  height: 220px;
+  padding-right: 24px;
+  position: relative;
+}
+
+.score-compare-track {
+  background: #dfe7e2;
+  border: 1px solid #28342d;
+  border-radius: 999px;
+  bottom: 8px;
+  overflow: hidden;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 6px;
+}
+
+.score-compare-fill {
+  background: #1f6f4a;
+  border-radius: 999px;
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.score-compare-marker {
+  height: 14px;
+  position: absolute;
+  right: 5px;
+  transform: translate(0, -50%);
+  width: 14px;
+}
+
+.score-compare-dot {
+  background: #c0392b;
+  border: 2px solid #fffdf6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #28342d;
+  display: block;
+  height: 10px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+}
+
+.score-compare-marker.is-ahead .score-compare-dot {
+  background: #1f6f4a;
+}
+
+.score-compare-marker.is-self .score-compare-dot {
+  background: #2f80ed;
+  height: 14px;
+  width: 14px;
+}
+
+.score-compare-label {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #dde7e1;
+  border-radius: 5px;
+  color: #1b2f25;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 116px;
+  overflow: hidden;
+  padding: 3px 5px;
+  position: absolute;
+  right: 18px;
+  text-align: right;
   text-overflow: ellipsis;
+  top: 50%;
+  transform: translateY(-50%);
   white-space: nowrap;
 }
 
-.score-compare-distance {
-  color: #1b2f25;
-  font-size: 14px;
-  font-weight: 700;
-  margin-top: 2px;
+.score-compare-marker.is-self .score-compare-label {
+  background: #eaf3ff;
+  border-color: #2f80ed;
+  color: #164f91;
+}
+
+.score-compare-marker.is-ahead .score-compare-label {
+  color: #1f6f4a;
+}
+
+.score-compare-marker.is-behind .score-compare-label {
+  color: #9b2f24;
 }
 
 .score-compare-empty {
@@ -196,18 +305,6 @@ canvas {
   width: 100%;
 }
 
-.score-compare-button {
-  background: #6f5a3a;
-  font-size: 15px;
-  min-height: 40px;
-  min-width: 0;
-  width: 100%;
-}
-
-.score-compare-button.is-on {
-  background: #1f6f4a;
-}
-
 .help-button {
   background: #4a7a6a;
   font-size: 15px;
@@ -223,8 +320,7 @@ canvas {
     padding: 0 6px 4px;
   }
 
-  .bgm-button,
-  .score-compare-button {
+  .bgm-button {
     font-size: 13px;
     min-height: 36px;
   }
@@ -310,6 +406,19 @@ button:active {
 
   .overlay {
     inset: 52px 0 0;
+  }
+
+  .score-compare-toggle,
+  .score-compare-nav {
+    right: 6px;
+    top: 58px;
+  }
+
+  .score-compare-toggle {
+    font-size: 12px;
+    min-height: 30px;
+    min-width: 48px;
+    padding: 0 8px;
   }
 
   .score-compare-nav {

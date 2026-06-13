@@ -30,8 +30,11 @@
 
       <canvas id="game" width="960" height="360"></canvas>
 
+      <button id="scoreCompareButton" class="score-compare-toggle" type="button">成绩</button>
       <aside id="scoreCompareNav" class="score-compare-nav hidden" aria-label="实时成绩对比">
-        <div class="score-compare-title">成绩距离</div>
+        <div class="score-compare-title">
+          <button id="scoreCompareClose" class="score-compare-close" type="button" aria-label="隐藏实时成绩">×</button>
+        </div>
         <div id="scoreCompareList" class="score-compare-list">
           <div class="score-compare-empty">开始游戏后显示与其他玩家的距离</div>
         </div>
@@ -107,7 +110,6 @@
     </div>
     <div class="bgm-control">
       <button id="bgmButton" class="control-button bgm-button" type="button">BGM: 和平的一天</button>
-      <button id="scoreCompareButton" class="control-button score-compare-button" type="button">成绩条: 关</button>
       <button id="helpButton" class="control-button help-button" type="button">玩法说明</button>
     </div>
 
