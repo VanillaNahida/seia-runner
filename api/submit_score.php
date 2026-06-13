@@ -502,8 +502,13 @@ if ($encryptedPayload === null) {
     exit;
 }
 
-$nickname    = getStrictPayloadString($encryptedPayload, "nickname", 64);
-$message     = getStrictPayloadString($encryptedPayload, "message", 128);
+$nicknameMaxLen = defined("NICKNAME_MAX_LENGTH") ? (int)NICKNAME_MAX_LENGTH : 10;
+$messageMaxLen  = defined("MESSAGE_MAX_LENGTH") ? (int)MESSAGE_MAX_LENGTH : 30;
+$nicknameMaxBytes = $nicknameMaxLen * 4;
+$messageMaxBytes  = $messageMaxLen * 4;
+
+$nickname    = getStrictPayloadString($encryptedPayload, "nickname", $nicknameMaxBytes);
+$message     = getStrictPayloadString($encryptedPayload, "message", $messageMaxBytes);
 $rawScore    = getStrictPayloadString($encryptedPayload, "score", 6);
 $score       = isValidScoreString($rawScore) ? intval($rawScore) : 0;
 $ip_addr     = resolveClientIp();
