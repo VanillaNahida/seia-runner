@@ -145,8 +145,9 @@ function consumeGameSessionForScore($token, $score, $clientElapsedMs = null, $op
         }
 
         $clientElapsed = $clientElapsedMs / 1000;
-        if ($clientElapsed > $elapsed + 2.0) {
-            $failureReason = "客户端游戏时长超过服务端记录，请刷新页面后重试";
+        $clientAheadTolerance = min(30.0, max(8.0, $clientElapsed * 0.08));
+        if ($clientElapsed > $elapsed + $clientAheadTolerance) {
+            $failureReason = "客户端游戏时长与服务端记录差异过大，请刷新页面后重试";
             return false;
         }
 
