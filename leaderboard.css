@@ -336,22 +336,20 @@ b, strong, h1, h2, h3, h4, h5, h6 {
 .server-error-modal {
   align-items: center;
   background: rgba(0, 0, 0, 0);
-  display: flex;
+  display: none;
   inset: 0;
   justify-content: center;
   opacity: 0;
-  pointer-events: none;
   position: fixed;
   transition: opacity 0.2s ease, background 0.2s ease;
-  visibility: hidden;
   z-index: 30;
 }
 
 .server-error-modal:not(.hidden) {
   background: rgba(0, 0, 0, 0.6);
+  display: flex;
   opacity: 1;
   pointer-events: auto;
-  visibility: visible;
 }
 
 .server-error-dialog {
