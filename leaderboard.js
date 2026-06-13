@@ -28,6 +28,40 @@ function normalizePageSize(pageSize) {
     return allowedPageSizes.indexOf(str) !== -1 ? str : '10';
 }
 
+function parseResponse(res) {
+    if (res.status === 403) {
+        var contentType = res.headers.get("Content-Type") || "";
+        if (contentType.indexOf("text/html") !== -1) {
+            return res.text().then(function (html) {
+                showServerError(html);
+                throw new Error("server 403 html response");
+            });
+        }
+    }
+    return res.json();
+}
+
+var serverErrorModal = document.getElementById("serverErrorModal");
+var serverErrorFrame = document.getElementById("serverErrorFrame");
+var serverErrorClose = document.getElementById("serverErrorClose");
+
+serverErrorClose.addEventListener("click", function () {
+    serverErrorModal.classList.add("hidden");
+    serverErrorFrame.srcdoc = "";
+});
+
+serverErrorModal.addEventListener("click", function (e) {
+    if (e.target === serverErrorModal) {
+        serverErrorModal.classList.add("hidden");
+        serverErrorFrame.srcdoc = "";
+    }
+});
+
+function showServerError(html) {
+    serverErrorFrame.srcdoc = html;
+    serverErrorModal.classList.remove("hidden");
+}
+
 function buildPageHref(type, pageSize, page, query) {
     var params = new URLSearchParams();
     params.set('type', normalizeType(type));
@@ -220,7 +254,7 @@ function loadData(type, page, pageSize, query) {
     }
 
     fetch(url)
-        .then(function(res) { return res.json(); })
+        .then(parseResponse)
         .then(function(data) {
             if (data.code === 0) {
                 currentType = safeType;

@@ -93,6 +93,16 @@
     </div>
   </footer>
 
+  <div id="serverErrorModal" class="server-error-modal hidden">
+    <div class="server-error-dialog">
+      <div class="server-error-header">
+        <h2>错误！</h2>
+        <button id="serverErrorClose" type="button" class="server-error-close-btn">X</button>
+      </div>
+      <iframe id="serverErrorFrame" class="server-error-frame" sandbox="allow-same-origin"></iframe>
+    </div>
+  </div>
+
   <script src="leaderboard.js"></script>
 </body>
 </html>

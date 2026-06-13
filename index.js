@@ -883,6 +883,40 @@
     }, 2500);
   }
 
+  var serverErrorModal = document.getElementById("serverErrorModal");
+  var serverErrorFrame = document.getElementById("serverErrorFrame");
+  var serverErrorClose = document.getElementById("serverErrorClose");
+
+  serverErrorClose.addEventListener("click", function () {
+    serverErrorModal.classList.add("hidden");
+    serverErrorFrame.srcdoc = "";
+  });
+
+  serverErrorModal.addEventListener("click", function (e) {
+    if (e.target === serverErrorModal) {
+      serverErrorModal.classList.add("hidden");
+      serverErrorFrame.srcdoc = "";
+    }
+  });
+
+  function showServerError(html) {
+    serverErrorFrame.srcdoc = html;
+    serverErrorModal.classList.remove("hidden");
+  }
+
+  function parseResponse(res) {
+    if (res.status === 403) {
+      var contentType = res.headers.get("Content-Type") || "";
+      if (contentType.indexOf("text/html") !== -1) {
+        return res.text().then(function (html) {
+          showServerError(html);
+          throw new Error("server 403 html response");
+        });
+      }
+    }
+    return res.json();
+  }
+
   uploadScoreBtn.addEventListener("click", function () {
     if (isAnyModalOpen()) return;
     openSubmitModal();
@@ -940,7 +974,7 @@
       cache: "no-store",
       credentials: "same-origin"
     })
-      .then(function (res) { return res.json(); })
+      .then(parseResponse)
       .then(function (nonceData) {
         if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
           throw new Error("invalid score nonce");
@@ -957,7 +991,7 @@
           body: formData.toString()
         });
       })
-      .then(function (res) { return res.json(); })
+      .then(parseResponse)
       .then(function (data) {
         submitConfirm.disabled = false;
         submitConfirm.textContent = "提交";
@@ -978,11 +1012,13 @@
           submitError.classList.remove("hidden");
         }
       })
-      .catch(function () {
+      .catch(function (err) {
         submitConfirm.disabled = false;
         submitConfirm.textContent = "提交";
-        submitError.textContent = "提交成绩失败：数据库出错，请稍后重试";
-        submitError.classList.remove("hidden");
+        if (err.message !== "server 403 html response") {
+          submitError.textContent = "提交成绩失败：数据库出错，请稍后重试";
+          submitError.classList.remove("hidden");
+        }
       });
   });
 
