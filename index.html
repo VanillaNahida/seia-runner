@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="//cdn.xcnahida.cn/fonts/bluearchive/Blueaka/Blueaka.css">
   <link rel="stylesheet" href="//cdn.xcnahida.cn/fonts/bluearchive/Blueaka_Bold/Blueaka_Bold.css">
   <link rel="stylesheet" href="./index.css">
-  <script defer="" src="./score-security.js"></script>
   <script defer="" src="./index.js"></script>
 </head>
 <body>
@@ -25,24 +24,19 @@
           <span id="score">SCORE: 00000</span>
           <span id="best">HI: 00721</span>
         </div>
-        <a id="rankBtn" class="rank-btn" href="leaderboard.html" title="排行榜">排行</a>
+        <a id="rankBtn" class="rank-btn" href="leaderboard.html" title="排行榜">排行榜</a>
       </div>
 
       <canvas id="game" width="960" height="360"></canvas>
 
-      <button id="scoreCompareButton" class="score-compare-toggle" type="button">成绩</button>
-      <aside id="scoreCompareNav" class="score-compare-nav hidden" aria-label="实时成绩对比">
-        <div class="score-compare-title">
-          <button id="scoreCompareClose" class="score-compare-close" type="button" aria-label="隐藏实时成绩">×</button>
-        </div>
-        <div id="scoreCompareList" class="score-compare-list">
-          <div class="score-compare-empty">开始游戏后显示与其他玩家的距离</div>
-        </div>
-      </aside>
+      <button id="pauseBtn" class="pause-btn hidden" type="button" aria-label="暂停/继续">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#1f1f1f"><path d="M560-200v-560h160v560H560Zm-320 0v-560h160v560H240Z"/></svg>
+      </button>
 
       <div id="overlay" class="overlay">
-        <h1>圣娅快跑</h1>
+        <h1 id="overlayTitle">圣娅快跑</h1>
         <p id="overlayText">圣娅：你跑不过我你信吗！按空格 / ↑ 或跳跃按钮起跳，长按跳得更高；按 ↓ 或下蹲按钮躲过雪碧。</p>
+        <p id="pauseText" class="hidden"></p>
         <div class="overlay-buttons">
           <button id="startButton" type="button">开始</button>
           <button id="uploadScoreBtn" class="hidden" type="button">上传成绩</button>
@@ -92,8 +86,8 @@
       <div class="submit-dialog">
         <h2>上传成绩</h2>
         <p class="submit-score">你的成绩: <strong id="submitScoreVal">0</strong></p>
-        <input id="submitNickname" type="text" placeholder="" autocomplete="off">
-        <input id="submitMessage" type="text" placeholder="" autocomplete="off">
+        <input id="submitNickname" type="text" maxlength="10" placeholder="昵称（最多10个字）" autocomplete="off">
+        <input id="submitMessage" type="text" maxlength="30" placeholder="留言（最多30个字，可选）" autocomplete="off">
         <p id="submitError" class="cheat-error hidden"></p>
         <div class="cheat-buttons">
           <button id="submitConfirm" type="button">提交</button>

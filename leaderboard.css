@@ -1,5 +1,6 @@
 * {
   box-sizing: border-box;
+  font-family: "Blueaka", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
   margin: 0;
   padding: 0;
 }
@@ -174,7 +175,7 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   background: #fff8e1;
   border: 2px solid #e6c34a;
   border-radius: 6px;
-  text-align: center;
+  text-align: left;
 }
 
 .notice-title {
@@ -186,11 +187,6 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   margin-bottom: 6px;
 }
 
-.notice-icon {
-  width: 24px;
-  height: 24px;
-  vertical-align: middle;
-}
 
 .rank-notice p {
   font-size: 13px;
@@ -198,7 +194,18 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   line-height: 1.6;
 }
 
+.rank-notice a {
+  font-size: 12px;
+  color: #1e90ff;
+  text-decoration: none;
+}
+
+.rank-notice a:hover {
+  text-decoration: underline;
+}
+
 .rank-controls {
+  font-family: "Blueaka", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
   padding: 0 20px 14px;
   text-align: right;
 }
@@ -439,6 +446,24 @@ b, strong, h1, h2, h3, h4, h5, h6 {
   padding: 10px 8px;
   text-align: left;
   white-space: nowrap;
+}
+
+.rank-table th.sortable {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.rank-table th.sortable:hover {
+  background: #dde7e1;
+}
+
+.rank-table th.sort-active {
+  color: #1f6f4a;
+}
+
+.sort-arrow {
+  font-size: 12px;
 }
 
 .rank-table td {

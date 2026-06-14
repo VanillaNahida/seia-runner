@@ -16,6 +16,3 @@ define("SENSITIVE_WORDS_FILE", __DIR__ . "/../sensitive_words/sensitive_words_li
 // 字数限制
 define("NICKNAME_MAX_LENGTH", 10);
 define("MESSAGE_MAX_LENGTH", 30);
-
-define("SCORE_DEBUG_MODE", false);
-define("SCORE_DEBUG_LOG_DIR", __DIR__ . "/debug_logs");

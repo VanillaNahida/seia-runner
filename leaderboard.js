@@ -4,6 +4,10 @@ var currentQuery = '';
 var currentPageSize = '10';
 var allowedTypes = ['day', 'week', 'month', 'all'];
 var allowedPageSizes = ['10', '20', '50', '100', 'all'];
+var allData = [];
+var sortState = { column: null, asc: true };
+var currentTotal = 0;
+var currentDataPageSize = 10;
 
 function escapeHTML(value) {
     return String(value == null ? '' : value)
@@ -121,6 +125,59 @@ function formatTime(dateStr) {
     var minutes = String(date.getMinutes()).padStart(2, '0');
     var seconds = String(date.getSeconds()).padStart(2, '0');
     return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+}
+
+function sortDataArray(arr, column, asc) {
+    var dir = asc ? 1 : -1;
+    arr.sort(function(a, b) {
+        var va, vb;
+        switch (column) {
+            case 'rank':
+                va = a._rank || 0;
+                vb = b._rank || 0;
+                return (va - vb) * dir;
+            case 'nickname':
+                va = a.nickname || '';
+                vb = b.nickname || '';
+                return va.localeCompare(vb, 'zh-CN') * dir;
+            case 'score':
+                va = parseFloat(a.score) || 0;
+                vb = parseFloat(b.score) || 0;
+                return (va - vb) * dir;
+            case 'message':
+                va = a.message || '';
+                vb = b.message || '';
+                return va.localeCompare(vb, 'zh-CN') * dir;
+            case 'location':
+                va = a.location || '';
+                vb = b.location || '';
+                return va.localeCompare(vb, 'zh-CN') * dir;
+            case 'device':
+                va = a.device || '';
+                vb = b.device || '';
+                return va.localeCompare(vb, 'zh-CN') * dir;
+            case 'updated_at':
+                va = a.updated_at || a.created_at || '';
+                vb = b.updated_at || b.created_at || '';
+                return (new Date(va) - new Date(vb)) * dir;
+            default:
+                return 0;
+        }
+    });
+}
+
+function updateSortIndicators() {
+    document.querySelectorAll('.rank-table th.sortable').forEach(function(th) {
+        var arrow = th.querySelector('.sort-arrow');
+        var col = th.getAttribute('data-column');
+        if (col === sortState.column) {
+            arrow.textContent = sortState.asc ? ' ▲' : ' ▼';
+            th.classList.add('sort-active');
+        } else {
+            arrow.textContent = '';
+            th.classList.remove('sort-active');
+        }
+    });
 }
 
 function getRankSuffix(rank) {
@@ -261,16 +318,27 @@ function loadData(type, page, pageSize, query) {
                 currentPage = safePage;
                 currentQuery = query || '';
                 currentPageSize = safePageSize;
+                currentTotal = data.total;
+                currentDataPageSize = data.pageSize;
 
                 document.getElementById('rankTitle').textContent =
                     (currentQuery ? '搜索: ' + currentQuery : '排行榜[' + getTypeLabel(currentType) + ']');
 
                 document.getElementById('recordCount').textContent = '共 ' + data.total + ' 条记录';
 
-                renderTable(data.data, data.total, data.page, data.pageSize);
-                renderCards(data.data, data.total, data.page, data.pageSize);
+                allData = data.data.map(function(item, index) {
+                    item._rank = (data.page - 1) * data.pageSize + index + 1;
+                    return item;
+                });
+                if (sortState.column) {
+                    sortDataArray(allData, sortState.column, sortState.asc);
+                }
+
+                renderTable(allData, data.total, data.page, data.pageSize);
+                renderCards(allData, data.total, data.page, data.pageSize);
                 renderPagination(data.total, data.pageSize, data.page);
                 updateNavActive();
+                updateSortIndicators();
             } else {
                 document.getElementById('rankTableBody').innerHTML = '<tr><td colspan="7" class="rank-loading">' + (data.message || '查询失败，请稍后重试') + '</td></tr>';
                 document.getElementById('rankList').innerHTML = '<div class="rank-item no-data"><div>' + (data.message || '查询失败，请稍后重试') + '</div></div>';
@@ -355,6 +423,24 @@ function init() {
         }
     });
 
+    // 排序：点击表头
+    document.querySelector('.rank-table thead').addEventListener('click', function(e) {
+        var th = e.target.closest('th.sortable');
+        if (!th) return;
+        var column = th.getAttribute('data-column');
+        if (sortState.column === column) {
+            sortState.asc = !sortState.asc;
+        } else {
+            sortState.column = column;
+            sortState.asc = true;
+        }
+        sortDataArray(allData, sortState.column, sortState.asc);
+        var pageSize = currentDataPageSize;
+        renderTable(allData, currentTotal, currentPage, pageSize);
+        renderCards(allData, currentTotal, currentPage, pageSize);
+        updateSortIndicators();
+    });
+    
     // 桌面端表格留言点击展开/收起
     document.getElementById('rankTableBody').addEventListener('click', function(e) {
         var target = e.target.closest('.col-msg');

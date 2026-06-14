@@ -10,14 +10,9 @@
   var startButton = document.getElementById("startButton");
   var jumpButton = document.getElementById("jumpButton");
   var duckButton = document.getElementById("duckButton");
-  var scoreCompareNav = document.getElementById("scoreCompareNav");
-  var scoreCompareButton = document.getElementById("scoreCompareButton");
-  var scoreCompareClose = document.getElementById("scoreCompareClose");
-  var scoreCompareList = document.getElementById("scoreCompareList");
-  var scoreCompareEnabled = localStorage.getItem("seia-runner-score-compare-enabled") === "1";
-  var compareScores = [];
-  var nextCompareFetchAt = 0;
-  var lastCompareRenderedScore = -1;
+  var pauseBtn = document.getElementById("pauseBtn");
+  var pauseText = document.getElementById("pauseText");
+  var overlayTitle = document.getElementById("overlayTitle");
 
   var W = canvas.width;
   var H = canvas.height;
@@ -31,6 +26,9 @@
   var lastTime = 0;
   var spawnTimer = 0;
   var state = "ready";
+  var countdownTimer = 0;
+  var pauseSvgHtml = '<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#1f1f1f"><path d="M560-200v-560h160v560H560Zm-320 0v-560h160v560H240Z"/></svg>';
+  var playSvgHtml = '<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#1f1f1f"><path d="M320-200v-560l440 280-440 280Z"/></svg>';
   var input = {
     jumpHeld: false,
     duckHeld: false
@@ -49,6 +47,7 @@
   var bgmButton = document.getElementById("bgmButton");
    bgmButton.textContent = "BGM: " + bgmList[bgmIndex].name;
 
+  // 页面隐藏时暂停音乐，返回时恢复
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       bgm.pause();
@@ -57,6 +56,7 @@
     }
   });
 
+  // 页面即将离开时暂停音乐
   window.addEventListener("pagehide", function () {
     bgm.pause();
   });
@@ -89,13 +89,12 @@
     vy: 0,
     grounded: true,
     ducking: false,
-    jumpHold: 0,
-    vaultTime: 0,
-    vaultDuration: 0.42
+    jumpHold: 0
   };
 
   var jumpBuffer = 0;
   var jumpBufferMax = 0.1;
+  var showHitboxes = false;
 
   var game = {
     speed: 410,
@@ -103,24 +102,8 @@
     score: 0,
     obstacles: [],
     dust: [],
-    invincible: false,
-    token: "",
-    proofSalt: "",
-    hashChallenge: null,
-    hashAnswers: [],
-    hashSolving: false,
-    nextHashChallengeAt: 0,
-    startedAt: 0,
-    endedAt: 0,
-    opStats: window.SeiaRunnerSecurity.createOperationStats(),
-    runtimeStats: window.SeiaRunnerSecurity.createRuntimeStats()
+    invincible: false
   };
-
-  var antiCheat = window.SeiaRunnerSecurity.createAntiCheat({
-    game: game,
-    player: player,
-    getState: function () { return state; }
-  });
 
   function loadAssets() {
     assetKeys.forEach(function (key) {
@@ -160,19 +143,6 @@
     game.score = 0;
     game.obstacles = [];
     game.dust = [];
-    game.token = "";
-    game.proofSalt = "";
-    game.hashChallenge = null;
-    game.hashAnswers = [];
-    game.hashSolving = false;
-    game.nextHashChallengeAt = 0;
-    game.elapsedMs = 0;
-    game.startedAt = 0;
-    game.endedAt = 0;
-    game.runtimeStats = window.SeiaRunnerSecurity.createRuntimeStats();
-    nextCompareFetchAt = 0;
-    lastCompareRenderedScore = -1;
-    antiCheat.resetOperationStats();
     jumpBuffer = 0;
     spawnTimer = 0.65;
     lastTime = performance.now();
@@ -186,38 +156,62 @@
 
     playBgm();
     resetGame();
+    state = "playing";
+    overlay.classList.add("hidden");
+    pauseBtn.classList.remove("hidden");
+    pauseBtn.innerHTML = pauseSvgHtml;
+    pauseText.classList.add("hidden");
+    pauseText.textContent = "";
+    jumpButton.classList.remove("disabled");
+    duckButton.classList.remove("disabled");
+    requestAnimationFrame(loop);
+  }
 
-    fetch("api/game_start.php", {
-      method: "POST",
-      cache: "no-store",
-      credentials: "same-origin"
-    })
-      .then(parseResponse)
-      .then(function (data) {
-        if (data.code !== 0 || !data.data || !data.data.token) {
-          throw new Error("invalid game token");
-        }
+  function togglePause() {
+    if (state === "playing") {
+      state = "paused";
+      overlay.classList.remove("hidden");
+      overlayText.textContent = "游戏已暂停";
+      pauseText.textContent = "点右上角按钮继续游戏";
+      pauseText.classList.remove("hidden");
+      pauseBtn.innerHTML = playSvgHtml;
+      startButton.classList.add("hidden");
+      uploadScoreBtn.classList.add("hidden");
+      overlayTitle.classList.add("hidden");
+    } else if (state === "paused") {
+      startCountdown();
+    }
+  }
 
-        game.token = data.data.token;
-        game.proofSalt = data.data.proofSalt || "";
-        game.hashChallenge = data.data.hashChallenge || null;
-        game.hashAnswers = [];
-        game.hashSolving = false;
-        game.nextHashChallengeAt = 0;
-        game.elapsedMs = 0;
-        game.startedAt = Date.now();
-        game.endedAt = 0;
-        state = "playing";
-        overlay.classList.add("hidden");
-        if (scoreCompareEnabled) {
-          fetchCompareScores(true);
-        }
-        requestAnimationFrame(loop);
-      })
-      .catch(function () {
-        overlayText.textContent = "游戏初始化失败，请刷新页面重试。";
-        overlay.classList.remove("hidden");
-      });
+  function startCountdown() {
+    state = "countdown";
+    countdownTimer = 3;
+    startButton.classList.add("hidden");
+    uploadScoreBtn.classList.add("hidden");
+    overlayText.textContent = "游戏即将开始...";
+    pauseText.textContent = "倒计时：" + countdownTimer;
+    countdownStep();
+  }
+
+  function countdownStep() {
+    if (state !== "countdown") return;
+    if (countdownTimer <= 0) {
+      resumeGame();
+      return;
+    }
+    pauseText.textContent = "倒计时：" + countdownTimer;
+    countdownTimer -= 1;
+    setTimeout(countdownStep, 1000);
+  }
+
+  function resumeGame() {
+    state = "playing";
+    overlay.classList.add("hidden");
+    pauseText.classList.add("hidden");
+    pauseText.textContent = "";
+    pauseBtn.innerHTML = pauseSvgHtml;
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
   }
 
   function playBgm() {
@@ -243,38 +237,9 @@
     }
   }
 
-  function applyScoreCompareVisibility() {
-    scoreCompareNav.classList.toggle("hidden", !scoreCompareEnabled);
-    scoreCompareButton.classList.toggle("hidden", scoreCompareEnabled);
-
-    if (!scoreCompareEnabled) {
-      lastCompareRenderedScore = -1;
-      return;
-    }
-
-    updateScoreCompare();
-    fetchCompareScores(true);
-  }
-
-  function toggleScoreCompare() {
-    scoreCompareEnabled = !scoreCompareEnabled;
-    localStorage.setItem("seia-runner-score-compare-enabled", scoreCompareEnabled ? "1" : "0");
-    applyScoreCompareVisibility();
-  }
-
   bgmButton.addEventListener("click", function (e) {
     e.preventDefault();
     switchBgm();
-  });
-
-  scoreCompareButton.addEventListener("click", function (e) {
-    e.preventDefault();
-    toggleScoreCompare();
-  });
-
-  scoreCompareClose.addEventListener("click", function (e) {
-    e.preventDefault();
-    toggleScoreCompare();
   });
 
   var helpButton = document.getElementById("helpButton");
@@ -315,7 +280,6 @@
     player.vy = jumpVelocity;
     player.grounded = false;
     player.jumpHold = maxJumpHold;
-    player.vaultTime = player.vaultDuration;
     jumpBuffer = 0;
     makeDust(player.x + 34, groundY - 8);
   }
@@ -338,12 +302,12 @@
     }
 
     state = "gameover";
-    game.endedAt = Date.now();
     playDeathSound();
     bestScore = Math.max(bestScore, game.score);
     localStorage.setItem("seia-runner-best", String(bestScore));
     updateScore();
-    overlayText.textContent = "圣娅：你跑不过我你信吗！按空格 / ↑ / 点击再跑一把。";
+    overlayText.textContent = "圣娅：你跑不过我你信吗！点重来按钮再跑一把。";
+    startButton.classList.remove("hidden");
     startButton.textContent = "重来";
     if (!game.invincible) {
       uploadScoreBtn.classList.remove("hidden");
@@ -351,11 +315,18 @@
       uploadScoreBtn.classList.add("hidden");
     }
     overlay.classList.remove("hidden");
+    overlayTitle.classList.remove("hidden");
+    pauseBtn.classList.add("hidden");
+    pauseText.classList.add("hidden");
+    pauseText.textContent = "";
+    jumpButton.classList.add("disabled");
+    duckButton.classList.add("disabled");
   }
 
   function playDeathSound() {
     deathSound.currentTime = 0;
     deathSound.play().catch(function () {
+      // If the browser blocks audio, the game can still end normally.
     });
   }
 
@@ -372,12 +343,6 @@
   }
 
   function spawnObstacle() {
-    var lastObstacle = game.obstacles.length > 0 ? game.obstacles[game.obstacles.length - 1] : null;
-    if (lastObstacle && lastObstacle.x + lastObstacle.w > W - 120) {
-      spawnTimer = 0.22;
-      return;
-    }
-
     var flying = game.score > 220 && Math.random() < 0.35;
     var useAlt = Math.random() < 0.5;
     var obstacle;
@@ -428,10 +393,7 @@
     }
 
     game.obstacles.push(obstacle);
-    var minInterval = 1.08;
-    var randomInterval = 0.64;
-    var difficultyReduction = Math.min(game.score / 4200, 0.22);
-    spawnTimer = minInterval + Math.random() * randomInterval - difficultyReduction;
+    spawnTimer = 0.92 + Math.random() * 0.78 - Math.min(game.score / 3200, 0.32);
   }
 
   function getFlyingY(lane) {
@@ -451,10 +413,6 @@
 
     if (jumpBuffer > 0) {
       jumpBuffer -= dt;
-    }
-
-    if (player.vaultTime > 0) {
-      player.vaultTime = Math.max(0, player.vaultTime - dt);
     }
 
     if (input.jumpHeld && player.jumpHold > 0 && player.vy < 0 && !input.duckHeld) {
@@ -519,6 +477,7 @@
     }
   }
 
+  // 检查玩家是否与障碍物碰撞
   function collides(obstacle) {
     var playerBox = getPlayerHitBox();
     var obstacleBox = {
@@ -682,130 +641,35 @@
     drawDust(dt);
     drawObstacles();
     drawPlayer();
+    drawHitboxes();
     updateScore();
   }
 
-  function fetchCompareScores(force) {
-    if (!scoreCompareEnabled) {
-      return;
-    }
+  function drawHitboxes() {
+    if (!showHitboxes) return;
 
-    var now = Date.now();
-    if (!force && now < nextCompareFetchAt) {
-      return;
-    }
+    // 玩家碰撞箱 - 淡蓝色
+    var pb = getPlayerHitBox();
+    ctx.strokeStyle = "rgba(135, 206, 250, 0.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
 
-    nextCompareFetchAt = now + 30000;
-    fetch("api/get_scores.php?type=all&page=1&pageSize=10", {
-      cache: "no-store",
-      credentials: "same-origin"
-    })
-      .then(parseResponse)
-      .then(function (data) {
-        if (data.code === 0 && Array.isArray(data.data)) {
-          compareScores = data.data.map(function (item) {
-            return {
-              nickname: String(item.nickname || "玩家"),
-              score: Number(item.score || 0)
-            };
-          }).filter(function (item) {
-            return item.score > 0;
-          });
-          lastCompareRenderedScore = -1;
-          updateScoreCompare();
-        }
-      })
-      .catch(function () {});
-  }
-
-  function updateScoreCompare() {
-    if (!scoreCompareEnabled || !scoreCompareList || lastCompareRenderedScore === game.score) {
-      return;
-    }
-
-    lastCompareRenderedScore = game.score;
-
-    if (compareScores.length === 0) {
-      lastCompareRenderedScore = -1;
-      scoreCompareList.innerHTML = '<div class="score-compare-empty">暂无排行榜数据</div>';
-      return;
-    }
-
-    var points = compareScores.map(function (item, index) {
-      return {
-        type: "player",
-        rank: index + 1,
-        nickname: item.nickname,
-        score: item.score,
-        delta: game.score - item.score
+    // 障碍物碰撞箱 - 淡红色
+    ctx.strokeStyle = "rgba(255, 130, 130, 0.85)";
+    game.obstacles.forEach(function (ob) {
+      var box = {
+        x: ob.x + ob.hitPad,
+        y: ob.y + ob.hitPad,
+        w: ob.w - ob.hitPad * 2,
+        h: ob.h - ob.hitPad * 2
       };
+      ctx.strokeRect(box.x, box.y, box.w, box.h);
     });
-    points.push({
-      type: "self",
-      rank: 0,
-      nickname: "我",
-      score: game.score,
-      delta: 0
-    });
-
-    var scores = points.map(function (point) {
-      return point.score;
-    });
-    var maxScore = Math.max.apply(null, scores.concat([1]));
-
-    points.sort(function (a, b) {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return a.type === "self" ? -1 : 1;
-    });
-
-    scoreCompareList.innerHTML = "";
-
-    var map = document.createElement("div");
-    map.className = "score-compare-map";
-
-    var track = document.createElement("div");
-    track.className = "score-compare-track";
-
-    var fill = document.createElement("div");
-    fill.className = "score-compare-fill";
-    fill.style.height = Math.max(0, Math.min(100, (game.score / maxScore) * 100)) + "%";
-    track.appendChild(fill);
-    map.appendChild(track);
-
-    points.forEach(function (point) {
-      var top = Math.max(4, Math.min(96, ((maxScore - point.score) / maxScore) * 100));
-      var marker = document.createElement("div");
-      marker.className = "score-compare-marker" + (point.type === "self" ? " is-self" : point.delta >= 0 ? " is-ahead" : " is-behind");
-      marker.style.top = top + "%";
-
-      var dot = document.createElement("span");
-      dot.className = "score-compare-dot";
-
-      var label = document.createElement("span");
-      label.className = "score-compare-label";
-      if (point.type === "self") {
-        label.textContent = "我 · " + point.score + "分";
-      } else if (point.delta >= 0) {
-        label.textContent = "#" + point.rank + " " + point.nickname + " · 领先" + point.delta;
-      } else {
-        label.textContent = "#" + point.rank + " " + point.nickname + " · 差" + Math.abs(point.delta);
-      }
-
-      marker.appendChild(dot);
-      marker.appendChild(label);
-      map.appendChild(marker);
-    });
-
-    scoreCompareList.appendChild(map);
   }
 
   function updateScore() {
     scoreEl.textContent = "SCORE: " + padScore(game.score || 0);
     bestEl.textContent = "HI " + padScore(bestScore);
-    updateScoreCompare();
-    fetchCompareScores(false);
   }
 
   function padScore(value) {
@@ -813,16 +677,17 @@
   }
 
   function loop(now) {
+    if (state === "paused" || state === "countdown") {
+      requestAnimationFrame(loop);
+      return;
+    }
     if (state !== "playing") {
       return;
     }
 
     var dt = Math.min((now - lastTime) / 1000, 0.033);
     lastTime = now;
-    game.elapsedMs += Math.round(dt * 1000);
     update(dt);
-    antiCheat.recordFrame(dt);
-    antiCheat.updateHashChallenge();
     drawFrame(dt);
 
     if (state === "playing") {
@@ -830,141 +695,154 @@
     }
   }
 
-  var securityUi = null;
+  function isCheatModalOpen() {
+    return !cheatModal.classList.contains("hidden");
+  }
 
-  document.addEventListener("visibilitychange", function () {
-    antiCheat.recordRuntimeEvent(document.hidden ? "hidden" : "visible");
-  });
-
-  window.addEventListener("blur", function () {
-    antiCheat.recordRuntimeEvent("blur");
-  });
-
-  window.addEventListener("focus", function () {
-    antiCheat.recordRuntimeEvent("focus");
-  });
-
-  window.addEventListener("resize", function () {
-    antiCheat.recordRuntimeEvent("resize");
-  });
+  function isSubmitModalOpen() {
+    return !submitModal.classList.contains("hidden");
+  }
 
   function isAnyModalOpen() {
-    return securityUi ? securityUi.isAnyModalOpen() : false;
+    return isCheatModalOpen() || isSubmitModalOpen();
   }
 
   window.addEventListener("keydown", function (event) {
-    if (isAnyModalOpen()) {
+    if (state === "gameover" || state === "paused" || state === "countdown") {
       return;
     }
-
-    if (event.repeat) {
+    if (isAnyModalOpen()) {
       return;
     }
 
     if (event.code === "Space" || event.code === "ArrowUp") {
       event.preventDefault();
       playBgm();
-      antiCheat.recordOperation("keyDown");
-      antiCheat.recordOperation("jumpDown");
       input.jumpHeld = true;
       jump();
     } else if (event.code === "ArrowDown") {
       event.preventDefault();
       playBgm();
-      antiCheat.recordOperation("keyDown");
-      antiCheat.recordOperation("duckDown");
       setDuck(true);
     }
   });
 
   window.addEventListener("keyup", function (event) {
+    if (state === "gameover" || state === "paused" || state === "countdown") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
     if (event.code === "Space" || event.code === "ArrowUp") {
       event.preventDefault();
-      antiCheat.recordOperation("keyUp");
-      antiCheat.recordOperation("jumpUp");
       input.jumpHeld = false;
       player.jumpHold = 0;
     } else if (event.code === "ArrowDown") {
       event.preventDefault();
-      antiCheat.recordOperation("keyUp");
-      antiCheat.recordOperation("duckUp");
       setDuck(false);
     }
   });
 
   canvas.addEventListener("pointerdown", function () {
+    if (state === "gameover" || state === "paused" || state === "countdown") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
     playBgm();
-    antiCheat.recordOperation("pointerDown");
-    antiCheat.recordOperation("jumpDown");
     input.jumpHeld = true;
     jump();
   });
   canvas.addEventListener("pointerup", function () {
+    if (state === "gameover" || state === "paused" || state === "countdown") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
-    antiCheat.recordOperation("pointerUp");
-    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   });
   canvas.addEventListener("pointercancel", function () {
+    if (state === "gameover" || state === "paused" || state === "countdown") {
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
-    antiCheat.recordOperation("pointerUp");
-    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   });
 
   function pressJumpButton(event) {
+    if (jumpButton.classList.contains("disabled")) {
+      event.preventDefault();
+      showToast("游戏已结束，为防止误触，请点击重来按钮重新开始");
+      return;
+    }
+    if (state === "paused" || state === "countdown") {
+      event.preventDefault();
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
     event.preventDefault();
     playBgm();
-    antiCheat.recordOperation("buttonDown");
-    antiCheat.recordOperation("jumpDown");
     input.jumpHeld = true;
     jump();
   }
 
   function releaseJumpButton(event) {
+    if (jumpButton.classList.contains("disabled")) {
+      event.preventDefault();
+      return;
+    }
+    if (state === "paused" || state === "countdown") {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
-    antiCheat.recordOperation("buttonUp");
-    antiCheat.recordOperation("jumpUp");
     input.jumpHeld = false;
     player.jumpHold = 0;
   }
 
   function pressDuckButton(event) {
+    if (duckButton.classList.contains("disabled")) {
+      event.preventDefault();
+      showToast("游戏已结束，为防止误触，请点击重来按钮重新开始");
+      return;
+    }
+    if (state === "paused" || state === "countdown") {
+      event.preventDefault();
+      return;
+    }
     if (isAnyModalOpen()) {
       return;
     }
 
     event.preventDefault();
     playBgm();
-    antiCheat.recordOperation("buttonDown");
-    antiCheat.recordOperation("duckDown");
     setDuck(true);
   }
 
   function releaseDuckButton(event) {
+    if (duckButton.classList.contains("disabled")) {
+      event.preventDefault();
+      return;
+    }
+    if (state === "paused" || state === "countdown") {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
-    antiCheat.recordOperation("buttonUp");
-    antiCheat.recordOperation("duckUp");
     setDuck(false);
   }
 
@@ -985,6 +863,181 @@
     playBgm();
     startGame();
   });
+
+  pauseBtn.addEventListener("click", function (event) {
+    event.stopPropagation();
+    togglePause();
+  });
+
+  var titleClicks = 0;
+  var cheatModal = document.getElementById("cheatModal");
+  var cheatInput = document.getElementById("cheatInput");
+  var cheatSubmit = document.getElementById("cheatSubmit");
+  var cheatCancel = document.getElementById("cheatCancel");
+  var titleEl = document.querySelector(".hud strong");
+
+  titleEl.style.cursor = "pointer";
+
+  titleEl.addEventListener("click", function () {
+    titleClicks += 1;
+
+    if (titleClicks >= 7 && !game.invincible) {
+      titleClicks = 0;
+      cheatModal.classList.remove("hidden");
+      cheatInput.value = "";
+      cheatInput.focus();
+    }
+  });
+
+  function closeCheatModal() {
+    cheatModal.classList.add("hidden");
+  }
+
+  var cheatCodes = [];
+
+  fetch("api/cheat_code.txt")
+    .then(function (res) { return res.text(); })
+    .then(function (text) {
+      var lines = text.split("\n");
+      lines.forEach(function (line) {
+        var code = line.trim().toUpperCase();
+        if (code !== "") {
+          cheatCodes.push(code);
+        }
+      });
+    })
+    .catch(function () {});
+
+  cheatSubmit.addEventListener("click", function () {
+    var inputCode = cheatInput.value.trim().toUpperCase();
+
+    if (inputCode !== "" && cheatCodes.indexOf(inputCode) !== -1) {
+      game.invincible = true;
+      closeCheatModal();
+      cheatSound.currentTime = 0;
+      cheatSound.play().catch(function () {});
+      showToast("作弊成功！");
+    } else {
+      document.getElementById("cheatError").classList.remove("hidden");
+    }
+  });
+
+  cheatCancel.addEventListener("click", closeCheatModal);
+
+  cheatInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      cheatSubmit.click();
+    } else if (event.key === "Escape") {
+      closeCheatModal();
+    }
+  });
+
+  cheatInput.addEventListener("input", function () {
+    document.getElementById("cheatError").classList.add("hidden");
+  });
+
+  // 成绩上传相关
+  var uploadScoreBtn = document.getElementById("uploadScoreBtn");
+  var submitModal = document.getElementById("submitModal");
+  var submitNickname = document.getElementById("submitNickname");
+  var submitMessage = document.getElementById("submitMessage");
+  var submitError = document.getElementById("submitError");
+  var submitScoreVal = document.getElementById("submitScoreVal");
+  var submitConfirm = document.getElementById("submitConfirm");
+  var submitCancel = document.getElementById("submitCancel");
+  var ipInfo = null;
+  var nicknameMaxLength = 12;
+  var messageMaxLength = 30;
+
+  // 页面加载时获取字数限制
+  fetch("api/get_limits.php", { cache: "no-store" })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.code === 0 && data.data) {
+        nicknameMaxLength = data.data.nickname_max_length || 12;
+        messageMaxLength = data.data.message_max_length || 30;
+        submitNickname.setAttribute("maxlength", nicknameMaxLength);
+        submitNickname.setAttribute("placeholder", "昵称（最多" + nicknameMaxLength + "个字）");
+        submitMessage.setAttribute("maxlength", messageMaxLength);
+        submitMessage.setAttribute("placeholder", "留言（最多" + messageMaxLength + "个字，可选）");
+      }
+    })
+    .catch(function () {
+      // 获取失败则使用默认值
+    });
+
+  // 页面加载时获取 IP 归属地信息
+  fetch("https://game.xcnahida.cn/api/v1/ip")
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.code === 0 && data.data) {
+        ipInfo = data;
+      }
+    })
+    .catch(function () {
+      // 获取失败则忽略，上传时 IP 和归属地为空
+    });
+
+  function getUserFingerprint() {
+    var comps = [];
+    comps.push(navigator.userAgent || "");
+    comps.push(navigator.language || "");
+    comps.push(screen.width + "x" + screen.height);
+    comps.push(screen.colorDepth);
+    comps.push(new Date().getTimezoneOffset());
+    comps.push(!!navigator.cookieEnabled);
+    comps.push(navigator.platform || "");
+    comps.push(navigator.hardwareConcurrency || 0);
+    if (navigator.deviceMemory) { comps.push(navigator.deviceMemory); }
+    var raw = comps.join("|");
+    return simpleHash(raw);
+  }
+
+  function simpleHash(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + ch;
+      hash = hash | 0;
+    }
+    return Math.abs(hash).toString(16);
+  }
+
+  function getUserDevice() {
+    var ua = navigator.userAgent;
+    if (/Windows/i.test(ua)) return "Windows";
+    if (/Mac/i.test(ua)) return "Mac";
+    if (/Android/i.test(ua)) return "Android";
+    if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
+    if (/Linux/i.test(ua)) return "Linux";
+    return "Unknown";
+  }
+
+  function openSubmitModal() {
+    if (isCheatModalOpen()) return;
+
+    if (game.invincible) {
+      showToast("作弊模式下无法上传成绩");
+      return;
+    }
+
+    if (game.score === 0) {
+      showToast("没有成绩数据，请先开始游戏！");
+      return;
+    }
+
+    submitScoreVal.textContent = game.score;
+    submitNickname.value = localStorage.getItem("seia-runner-nick") || "";
+    submitMessage.value = localStorage.getItem("seia-runner-msg") || "";
+    submitError.classList.add("hidden");
+    submitModal.classList.remove("hidden");
+    submitNickname.focus();
+  }
+
+  function closeSubmitModal() {
+    submitModal.classList.add("hidden");
+  }
 
   var toastEl = document.getElementById("toast");
   var toastTimer = 0;
@@ -1032,15 +1085,135 @@
     return res.json();
   }
 
-  securityUi = window.SeiaRunnerSecurity.initScoreSubmitAndCheat({
-    game: game,
-    antiCheat: antiCheat,
-    parseResponse: parseResponse,
-    showToast: showToast,
-    cheatSound: cheatSound
+  uploadScoreBtn.addEventListener("click", function () {
+    if (isAnyModalOpen()) return;
+    openSubmitModal();
   });
 
-  applyScoreCompareVisibility();
+  submitCancel.addEventListener("click", function () {
+    closeSubmitModal();
+  });
+
+  submitConfirm.addEventListener("click", function () {
+    var nickname = submitNickname.value.trim();
+    var message = submitMessage.value.trim();
+
+    if (nickname === "") {
+      submitError.textContent = "请输入昵称";
+      submitError.classList.remove("hidden");
+      return;
+    }
+
+    if (nickname.length > nicknameMaxLength) {
+      submitError.textContent = "昵称不能超过" + nicknameMaxLength + "个字";
+      submitError.classList.remove("hidden");
+      return;
+    }
+
+    if (message.length > messageMaxLength) {
+      submitError.textContent = "留言不能超过" + messageMaxLength + "个字";
+      submitError.classList.remove("hidden");
+      return;
+    }
+
+    submitConfirm.disabled = true;
+    submitConfirm.textContent = "提交中...";
+    submitError.classList.add("hidden");
+
+    var formData = new URLSearchParams();
+    formData.append("nickname", nickname);
+    formData.append("message", message);
+    formData.append("score", String(game.score));
+    formData.append("ip_addr", ipInfo ? ipInfo.data.addr || "" : "");
+    formData.append("device", getUserDevice());
+    formData.append("fingerprint", getUserFingerprint());
+
+    if (ipInfo && ipInfo.data) {
+      var locParts = [];
+      if (ipInfo.data.country) locParts.push(ipInfo.data.country);
+      if (ipInfo.data.province) locParts.push(ipInfo.data.province);
+      formData.append("location", locParts.join("·"));
+    } else {
+      formData.append("location", "");
+    }
+
+    fetch("api/score_nonce.php", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin"
+    })
+      .then(parseResponse)
+      .then(function (nonceData) {
+        if (nonceData.code !== 0 || !nonceData.data || !nonceData.data.nonce) {
+          throw new Error("invalid score nonce");
+        }
+
+        formData.append("score_nonce", nonceData.data.nonce);
+
+        return fetch("api/submit_score.php", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+          },
+          body: formData.toString()
+        });
+      })
+      .then(parseResponse)
+      .then(function (data) {
+        submitConfirm.disabled = false;
+        submitConfirm.textContent = "提交";
+
+        if (data.code === 0) {
+          localStorage.setItem("seia-runner-nick", nickname);
+          localStorage.setItem("seia-runner-msg", message);
+          closeSubmitModal();
+          if (data.data.updated) {
+            showToast("成绩已更新！提高了 " + data.data.improved + " 分，当前排名第 " + data.data.rank + " 名");
+          } else if (data.data.oldScore) {
+            showToast(data.message);
+          } else {
+            showToast("上传成功！当前排名第 " + data.data.rank + " 名");
+          }
+        } else {
+          submitError.textContent = "提交成绩失败：" + (data.message || "未知错误");
+          submitError.classList.remove("hidden");
+        }
+      })
+      .catch(function (err) {
+        submitConfirm.disabled = false;
+        submitConfirm.textContent = "提交";
+        if (err.message !== "server 403 html response") {
+          submitError.textContent = "提交成绩失败：数据库出错，请稍后重试";
+          submitError.classList.remove("hidden");
+        }
+      });
+  });
+
+  // 提交弹窗内按 Enter / Esc 处理
+  submitNickname.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitMessage.focus();
+    } else if (event.key === "Escape") {
+      closeSubmitModal();
+    }
+  });
+  submitMessage.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitConfirm.click();
+    } else if (event.key === "Escape") {
+      closeSubmitModal();
+    }
+  });
+
   updateScore();
   loadAssets();
+
+  // 碰撞箱调试函数
+  window.toggleHitboxes = function () {
+    showHitboxes = !showHitboxes;
+    console.log("碰撞箱显示: " + (showHitboxes ? "ON" : "OFF"));
+  };
 }());
