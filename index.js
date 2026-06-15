@@ -25,6 +25,10 @@
   var bestScore = Number(localStorage.getItem("seia-runner-best") || 0);
   var lastTime = 0;
   var spawnTimer = 0;
+  var lastObstacleDistance = 0;
+  var lastObstacleType = "";
+  var MIN_SAME_TYPE_GAP = 350;
+  var MIN_MIXED_TYPE_GAP = 520;
   var state = "ready";
   var countdownTimer = 0;
   var pauseSvgHtml = '<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#1f1f1f"><path d="M560-200v-560h160v560H560Zm-320 0v-560h160v560H240Z"/></svg>';
@@ -145,6 +149,8 @@
     game.dust = [];
     jumpBuffer = 0;
     spawnTimer = 0.65;
+    lastObstacleDistance = 0;
+    lastObstacleType = "";
     lastTime = performance.now();
   }
 
@@ -344,6 +350,15 @@
 
   function spawnObstacle() {
     var flying = game.score > 220 && Math.random() < 0.35;
+    var newType = flying ? "flying" : "ground";
+    var typeChanged = lastObstacleType && lastObstacleType !== newType;
+    var neededGap = typeChanged ? MIN_MIXED_TYPE_GAP : MIN_SAME_TYPE_GAP;
+
+    if (game.distance - lastObstacleDistance < neededGap) {
+      spawnTimer = 0.12;
+      return;
+    }
+
     var useAlt = Math.random() < 0.5;
     var obstacle;
 
@@ -393,6 +408,8 @@
     }
 
     game.obstacles.push(obstacle);
+    lastObstacleDistance = game.distance;
+    lastObstacleType = newType;
     spawnTimer = 0.92 + Math.random() * 0.78 - Math.min(game.score / 3200, 0.32);
   }
 
