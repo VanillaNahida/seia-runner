@@ -9,10 +9,13 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET") {
     exit;
 }
 
+$nonce = issueScoreNonce();
+
 echo json_encode([
     "code" => 0,
     "data" => [
-        "nonce" => issueScoreNonce(),
+        "nonce"    => $nonce,
+        "token"    => getScoreNonceToken($nonce),
         "expiresIn" => getScoreNonceTtl()
     ]
 ]);

@@ -186,8 +186,17 @@ if ($message !== "") {
     }
 }
 
-if (!consumeScoreNonce($scoreNonce)) {
+$nonceToken = consumeScoreNonce($scoreNonce);
+if ($nonceToken === false) {
     echo json_encode(["code" => 403, "message" => "Score submission expired, please try again"]);
+    exit;
+}
+
+// 签名校验：SHA-256(score|nonce|token|fingerprint)
+$checksum = isset($_POST["checksum"]) ? trim($_POST["checksum"]) : "";
+$expected = hash("sha256", $score . "|" . $scoreNonce . "|" . $nonceToken . "|" . $fingerprint);
+if (!hash_equals($expected, $checksum)) {
+    echo json_encode(["code" => 403, "message" => "Invalid request signature"]);
     exit;
 }
 

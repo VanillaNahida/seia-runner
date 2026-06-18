@@ -35,8 +35,8 @@ function pruneScoreNonces() {
         return;
     }
 
-    foreach ($_SESSION["score_nonces"] as $nonce => $expiresAt) {
-        if (!is_int($expiresAt) || $expiresAt < $now) {
+    foreach ($_SESSION["score_nonces"] as $nonce => $data) {
+        if (!is_array($data) || !isset($data["expires"]) || $data["expires"] < $now) {
             unset($_SESSION["score_nonces"][$nonce]);
         }
     }
@@ -46,9 +46,27 @@ function issueScoreNonce() {
     pruneScoreNonces();
 
     $nonce = bin2hex(random_bytes(32));
-    $_SESSION["score_nonces"][$nonce] = time() + getScoreNonceTtl();
+    $token = bin2hex(random_bytes(16));
+    $_SESSION["score_nonces"][$nonce] = [
+        "expires" => time() + getScoreNonceTtl(),
+        "token"   => $token
+    ];
 
     return $nonce;
+}
+
+function getScoreNonceToken($nonce) {
+    pruneScoreNonces();
+
+    if (!is_string($nonce) || !preg_match('/^[a-f0-9]{64}$/', $nonce)) {
+        return null;
+    }
+
+    if (!isset($_SESSION["score_nonces"][$nonce])) {
+        return null;
+    }
+
+    return $_SESSION["score_nonces"][$nonce]["token"];
 }
 
 function consumeScoreNonce($nonce) {
@@ -62,8 +80,9 @@ function consumeScoreNonce($nonce) {
         return false;
     }
 
+    $token = $_SESSION["score_nonces"][$nonce]["token"];
     unset($_SESSION["score_nonces"][$nonce]);
-    return true;
+    return $token;
 }
 
 function getDB() {
