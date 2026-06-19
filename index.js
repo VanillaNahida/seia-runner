@@ -44,9 +44,10 @@
   var lastTime = 0;
   var spawnTimer = 0;
   var lastObstacleDistance = 0;
-  var lastObstacleType = "";
+  var lastObstacleLane = "";
   var MIN_SAME_TYPE_GAP = 350;
   var MIN_MIXED_TYPE_GAP = 520;
+  var MIN_CONFLICT_GAP = 700;
   var state = "ready";
   var countdownTimer = 0;
   var pauseSvgHtml = '<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#1f1f1f"><path d="M560-200v-560h160v560H560Zm-320 0v-560h160v560H240Z"/></svg>';
@@ -168,7 +169,7 @@
     jumpBuffer = 0;
     spawnTimer = 0.65;
     lastObstacleDistance = 0;
-    lastObstacleType = "";
+    lastObstacleLane = "";
     lastTime = performance.now();
   }
 
@@ -196,7 +197,7 @@
       state = "paused";
       overlay.classList.remove("hidden");
       overlayText.textContent = "游戏已暂停";
-      pauseText.textContent = "点右上角按钮继续游戏";
+      pauseText.textContent = "点右上角按钮或按 P 键继续游戏";
       pauseText.classList.remove("hidden");
       pauseBtn.innerHTML = playSvgHtml;
       startButton.classList.add("hidden");
@@ -368,9 +369,35 @@
 
   function spawnObstacle() {
     var flying = game.score > 220 && Math.random() < 0.35;
-    var newType = flying ? "flying" : "ground";
-    var typeChanged = lastObstacleType && lastObstacleType !== newType;
-    var neededGap = typeChanged ? MIN_MIXED_TYPE_GAP : MIN_SAME_TYPE_GAP;
+    var newLane;
+    var speedMultiplier;
+
+    if (flying) {
+      var heightRoll = Math.random();
+      if (heightRoll < 0.45) {
+        newLane = "duck";
+        speedMultiplier = 1.04 + Math.random() * 0.28;
+      } else if (heightRoll < 0.78) {
+        newLane = "jump";
+        speedMultiplier = 0.94 + Math.random() * 0.22;
+      } else {
+        newLane = "high";
+        speedMultiplier = 1.12 + Math.random() * 0.38;
+      }
+    } else {
+      newLane = "ground";
+    }
+
+    var conflict = (lastObstacleLane === "ground" && newLane === "duck") ||
+                   (lastObstacleLane === "duck" && newLane === "ground");
+    var neededGap;
+    if (conflict) {
+      neededGap = MIN_CONFLICT_GAP;
+    } else if (lastObstacleLane && lastObstacleLane !== newLane) {
+      neededGap = MIN_MIXED_TYPE_GAP;
+    } else {
+      neededGap = MIN_SAME_TYPE_GAP;
+    }
 
     if (game.distance - lastObstacleDistance < neededGap) {
       spawnTimer = 0.12;
@@ -381,35 +408,15 @@
     var obstacle;
 
     if (flying) {
-      var heightRoll = Math.random();
-      var lane;
-      var speedMultiplier;
-
-      if (heightRoll < 0.45) {
-        lane = "duck";
-      } else if (heightRoll < 0.78) {
-        lane = "jump";
-      } else {
-        lane = "high";
-      }
-
-      if (lane === "duck") {
-        speedMultiplier = 1.04 + Math.random() * 0.28;
-      } else if (lane === "jump") {
-        speedMultiplier = 0.94 + Math.random() * 0.22;
-      } else {
-        speedMultiplier = 1.12 + Math.random() * 0.38;
-      }
-
       obstacle = {
         type: "spriteBottle",
         img: images.spriteBottle,
         x: W + 30,
-        y: getFlyingY(lane),
+        y: getFlyingY(newLane),
         w: 134,
         h: 76,
         hitPad: 16,
-        lane: lane,
+        lane: newLane,
         speedMultiplier: speedMultiplier
       };
     } else {
@@ -427,7 +434,7 @@
 
     game.obstacles.push(obstacle);
     lastObstacleDistance = game.distance;
-    lastObstacleType = newType;
+    lastObstacleLane = newLane;
     spawnTimer = 0.92 + Math.random() * 0.78 - Math.min(game.score / 3200, 0.32);
   }
 
@@ -743,6 +750,14 @@
   }
 
   window.addEventListener("keydown", function (event) {
+    if (event.code === "KeyP") {
+      event.preventDefault();
+      if (state === "playing" || state === "paused") {
+        togglePause();
+      }
+      return;
+    }
+
     if (state === "gameover" || state === "paused" || state === "countdown") {
       return;
     }
@@ -750,12 +765,12 @@
       return;
     }
 
-    if (event.code === "Space" || event.code === "ArrowUp") {
+    if (event.code === "Space" || event.code === "ArrowUp" || event.code === "KeyW") {
       event.preventDefault();
       playBgm();
       input.jumpHeld = true;
       jump();
-    } else if (event.code === "ArrowDown") {
+    } else if (event.code === "ArrowDown" || event.code === "KeyS") {
       event.preventDefault();
       playBgm();
       setDuck(true);
@@ -770,11 +785,11 @@
       return;
     }
 
-    if (event.code === "Space" || event.code === "ArrowUp") {
+    if (event.code === "Space" || event.code === "ArrowUp" || event.code === "KeyW") {
       event.preventDefault();
       input.jumpHeld = false;
       player.jumpHold = 0;
-    } else if (event.code === "ArrowDown") {
+    } else if (event.code === "ArrowDown" || event.code === "KeyS") {
       event.preventDefault();
       setDuck(false);
     }

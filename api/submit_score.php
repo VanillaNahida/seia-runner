@@ -22,8 +22,9 @@ function isValidScoreString($score) {
     if ($normalized === "") {
         return false;
     }
-
-    $max = "999999";
+    
+    // 最大分数为99999999
+    $max = "99999999";
     return strlen($normalized) < strlen($max)
         || (strlen($normalized) === strlen($max) && strcmp($normalized, $max) <= 0);
 }
