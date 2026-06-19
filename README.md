@@ -2,7 +2,9 @@
 
 ![:name](https://count.getloli.com/@seia-runner?name=seia-runner&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
-一个基于 Canvas 的横版跑酷网页游戏，控制《蔚蓝档案》的百合园圣娅躲避障碍物，挑战最高分。
+<div align="center">
+  <img width="2056" height="1156" alt="圣娅快跑小游戏_封面" src="https://github.com/user-attachments/assets/2fb67743-4bdc-4c15-aefc-8394117f976c" />
+</div>
 
 <div align="center">
 
@@ -14,6 +16,8 @@
   [![Author](https://img.shields.io/badge/%E4%BD%9C%E8%80%85-VanillaNahida-green)](https://github.com/VanillaNahida)
 
 </div>
+
+一个基于 Canvas 的横版跑酷网页游戏，控制《蔚蓝档案》的百合园圣娅躲避障碍物，挑战最高分。
 
 # 玩法说明
 
