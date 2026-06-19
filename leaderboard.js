@@ -268,11 +268,38 @@ function renderPagination(total, pageSize, currentPage) {
         html += '<li class="disabled"><a href="#">&laquo;</a></li>';
     }
 
-    for (var i = 1; i <= totalPages; i++) {
-        if (i === currentPage) {
-            html += '<li class="active"><a href="' + buildPageHref(safeType, safePageSize, i, currentQuery) + '">' + i + '</a></li>';
+    var pagesToShow = [];
+    var range = 2;
+
+    pagesToShow.push(1);
+
+    var pageStart = Math.max(2, currentPage - range);
+    var pageEnd = Math.min(totalPages - 1, currentPage + range);
+
+    if (pageStart > 2) {
+        pagesToShow.push("...");
+    }
+
+    for (var i = pageStart; i <= pageEnd; i++) {
+        pagesToShow.push(i);
+    }
+
+    if (pageEnd < totalPages - 1) {
+        pagesToShow.push("...");
+    }
+
+    if (totalPages > 1) {
+        pagesToShow.push(totalPages);
+    }
+
+    for (var j = 0; j < pagesToShow.length; j++) {
+        var p = pagesToShow[j];
+        if (p === "...") {
+            html += '<li class="disabled"><a href="#">&hellip;</a></li>';
+        } else if (p === currentPage) {
+            html += '<li class="active"><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery) + '">' + p + '</a></li>';
         } else {
-            html += '<li><a href="' + buildPageHref(safeType, safePageSize, i, currentQuery) + '">' + i + '</a></li>';
+            html += '<li><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery) + '">' + p + '</a></li>';
         }
     }
 

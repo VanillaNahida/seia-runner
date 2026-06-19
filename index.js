@@ -1,6 +1,24 @@
 (function () {
   "use strict";
 
+  // 反调试
+  var devtoolsOpen = false;
+  var devtoolsCheck = document.createElement("div");
+  Object.defineProperty(devtoolsCheck, "id", {
+    get: function () {
+      devtoolsOpen = true;
+    }
+  });
+  setInterval(function () {
+    devtoolsOpen = false;
+    console.log(devtoolsCheck);
+    console.clear();
+    if (devtoolsOpen) {
+      while (true) {}
+    }
+  }, 1000);
+  setInterval(function () { debugger; }, 50);
+
   var canvas = document.getElementById("game");
   var ctx = canvas.getContext("2d");
   var scoreEl = document.getElementById("score");
@@ -1167,13 +1185,21 @@
 
         formData.append("score_nonce", nonceData.data.nonce);
 
-        return fetch("api/submit_score.php", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-          },
-          body: formData.toString()
+        var checksumInput = game.score + "|" + nonceData.data.nonce + "|" + nonceData.data.token + "|" + getUserFingerprint();
+        var encoder = new TextEncoder();
+        return crypto.subtle.digest("SHA-256", encoder.encode(checksumInput)).then(function (hashBuf) {
+          var hashArr = Array.from(new Uint8Array(hashBuf));
+          var checksum = hashArr.map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+          formData.append("checksum", checksum);
+
+          return fetch("api/submit_score.php", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+            },
+            body: formData.toString()
+          });
         });
       })
       .then(parseResponse)
