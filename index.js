@@ -996,6 +996,9 @@
   var submitScoreVal = document.getElementById("submitScoreVal");
   var submitConfirm = document.getElementById("submitConfirm");
   var submitCancel = document.getElementById("submitCancel");
+  var geetestCaptchaContainer = document.getElementById("geetestCaptchaContainer");
+  var captchaObj = null;
+  var captchaInitInProgress = false;
   var ipInfo = null;
   var nicknameMaxLength = 12;
   var messageMaxLength = 30;
@@ -1083,10 +1086,64 @@
     submitError.classList.add("hidden");
     submitModal.classList.remove("hidden");
     submitNickname.focus();
+
+    // 初始化极验验证码
+    initGeetestCaptcha();
+  }
+
+  function initGeetestCaptcha() {
+    if (captchaInitInProgress) return;
+    captchaInitInProgress = true;
+
+    // 清除旧的验证码
+    geetestCaptchaContainer.innerHTML = '<p id="geetestWait" style="color:#999;font-size:14px;margin:0;">正在加载验证码...</p>';
+
+    fetch("api/captcha/geetest_register.php?t=" + Date.now(), {
+      method: "GET",
+      cache: "no-store"
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        geetestCaptchaContainer.innerHTML = "";
+        if (typeof initGeetest4 !== "function") {
+          geetestCaptchaContainer.innerHTML = '<p style="color:#c0392b;font-size:14px;margin:0;">验证码组件加载失败，请检查网络后刷新页面重试，或联系管理员</p>';
+          captchaInitInProgress = false;
+          return;
+        }
+        if (!data || data.code !== 0 || !data.data || !data.data.captcha_id) {
+          geetestCaptchaContainer.innerHTML = '<p style="color:#c0392b;font-size:14px;margin:0;">验证码服务暂不可用，请稍后刷新页面重试</p>';
+          captchaInitInProgress = false;
+          return;
+        }
+        initGeetest4({
+          captchaId: data.data.captcha_id,
+          product: "float",
+          width: "100%"
+        }, function (captcha) {
+          captchaObj = captcha;
+          captcha.appendTo("#geetestCaptchaContainer");
+          captcha.onReady(function () {
+            captchaInitInProgress = false;
+          });
+        });
+      })
+      .catch(function () {
+        geetestCaptchaContainer.innerHTML = '<p style="color:#c0392b;font-size:14px;margin:0;">无法连接到验证码服务，请检查网络后刷新页面重试</p>';
+        captchaInitInProgress = false;
+      });
+  }
+
+  function destroyGeetestCaptcha() {
+    if (captchaObj && typeof captchaObj.reset === "function") {
+      captchaObj.reset();
+    }
+    captchaObj = null;
+    geetestCaptchaContainer.innerHTML = "";
   }
 
   function closeSubmitModal() {
     submitModal.classList.add("hidden");
+    destroyGeetestCaptcha();
   }
 
   var toastEl = document.getElementById("toast");
@@ -1170,6 +1227,23 @@
     submitConfirm.textContent = "提交中...";
     submitError.classList.add("hidden");
 
+    // 检查验证码是否已完成
+    if (!captchaObj || typeof captchaObj.getValidate !== "function") {
+      submitError.textContent = "请先完成验证码验证";
+      submitError.classList.remove("hidden");
+      submitConfirm.disabled = false;
+      submitConfirm.textContent = "提交";
+      return;
+    }
+    var captchaResult = captchaObj.getValidate();
+    if (!captchaResult) {
+      submitError.textContent = "请先完成验证码验证";
+      submitError.classList.remove("hidden");
+      submitConfirm.disabled = false;
+      submitConfirm.textContent = "提交";
+      return;
+    }
+
     var formData = new URLSearchParams();
     formData.append("nickname", nickname);
     formData.append("message", message);
@@ -1177,6 +1251,10 @@
     formData.append("ip_addr", ipInfo ? ipInfo.data.addr || "" : "");
     formData.append("device", getUserDevice());
     formData.append("fingerprint", getUserFingerprint());
+    formData.append("lot_number", captchaResult.lot_number);
+    formData.append("captcha_output", captchaResult.captcha_output);
+    formData.append("pass_token", captchaResult.pass_token);
+    formData.append("gen_time", captchaResult.gen_time);
 
     if (ipInfo && ipInfo.data) {
       var locParts = [];

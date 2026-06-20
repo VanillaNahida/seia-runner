@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . "/init.php";
+require_once __DIR__ . "/captcha/geetest_config.php";
+require_once __DIR__ . "/captcha/geetest_lib.php";
 
 header("Content-Type: application/json; charset=utf-8");
 
@@ -124,6 +126,10 @@ $device      = isset($_POST["device"])      ? trim($_POST["device"])      : "";
 $location    = isset($_POST["location"])    ? trim($_POST["location"])    : "";
 $fingerprint = isset($_POST["fingerprint"])  ? trim($_POST["fingerprint"]) : "";
 $scoreNonce  = isset($_POST["score_nonce"]) ? trim($_POST["score_nonce"]) : "";
+$lotNumber     = isset($_POST["lot_number"])     ? trim($_POST["lot_number"])     : "";
+$captchaOutput = isset($_POST["captcha_output"]) ? trim($_POST["captcha_output"]) : "";
+$passToken     = isset($_POST["pass_token"])     ? trim($_POST["pass_token"])     : "";
+$genTime       = isset($_POST["gen_time"])       ? trim($_POST["gen_time"])       : "";
 
 if (mb_strlen($fingerprint, "UTF-8") > 128) {
     echo json_encode(["code" => 400, "message" => "Fingerprint is too long"]);
@@ -198,6 +204,23 @@ $checksum = isset($_POST["checksum"]) ? trim($_POST["checksum"]) : "";
 $expected = hash("sha256", $score . "|" . $scoreNonce . "|" . $nonceToken . "|" . $fingerprint);
 if (!hash_equals($expected, $checksum)) {
     echo json_encode(["code" => 403, "message" => "Invalid request signature"]);
+    exit;
+}
+
+// 极验验证码校验 (GT 4.0)
+$geetestLib = new GeetestLib(GEETEST_ID, GEETEST_KEY);
+$geetestResult = $geetestLib->validate($lotNumber, $captchaOutput, $passToken, $genTime);
+
+// 如果在线验证失败，回退到本地校验
+if ($geetestResult->getStatus() !== 1) {
+    error_log("[Geetest] 二次验证: 在线验证失败，回退到本地校验 | captcha_id=" . GEETEST_ID . " | msg=" . $geetestResult->getMsg());
+    $geetestResult = $geetestLib->failValidate($lotNumber, $captchaOutput, $passToken, $genTime);
+} else {
+    error_log("[Geetest] 二次验证: 在线验证通过 | captcha_id=" . GEETEST_ID);
+}
+
+if ($geetestResult->getStatus() !== 1) {
+    echo json_encode(["code" => 403, "message" => "验证码验证失败，请重新提交"]);
     exit;
 }
 

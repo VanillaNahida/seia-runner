@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="//cdn.xcnahida.cn/fonts/bluearchive/Blueaka_Bold/Blueaka_Bold.css">
   <link rel="stylesheet" href="./index.css">
   <script defer="" src="./index.js"></script>
+  <script src="https://static.geetest.com/v4/gt4.js"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -50,8 +51,8 @@
         <input id="cheatInput" type="text" maxlength="20" placeholder="输入代码..." autocomplete="off">
         <p id="cheatError" class="cheat-error hidden">神秘代码无效！</p>
         <div class="cheat-buttons">
-          <button id="cheatSubmit" type="button">确认</button>
           <button id="cheatCancel" type="button">取消</button>
+          <button id="cheatSubmit" type="button">确认</button>
         </div>
       </div>
     </div>
@@ -88,10 +89,11 @@
         <p class="submit-score">你的成绩: <strong id="submitScoreVal">0</strong></p>
         <input id="submitNickname" type="text" maxlength="10" placeholder="昵称（最多10个字）" autocomplete="off">
         <input id="submitMessage" type="text" maxlength="30" placeholder="留言（最多30个字，可选）" autocomplete="off">
+        <div id="geetestCaptchaContainer" class="geetest-captcha-container"></div>
         <p id="submitError" class="cheat-error hidden"></p>
         <div class="cheat-buttons">
-          <button id="submitConfirm" type="button">提交</button>
           <button id="submitCancel" type="button">取消</button>
+          <button id="submitConfirm" type="button">提交</button>
         </div>
       </div>
     </div>
