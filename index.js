@@ -61,7 +61,8 @@
     { name: "张雪峰老师我还记得你😭", file: "assets/music/bgm.mp3" },
     { name: "熊大快跑BGM 1", file: "assets/music/bgm_xdkp.mp3" },
     { name: "你说你有点难追", file: "assets/music/%E9%87%91%E7%94%9F%20-%20%E5%91%8A%E7%99%BD%E6%B0%94%E7%90%83%20%28%E5%8F%98%E9%80%9F%29.mp3" },
-    { name: "熊大快跑BGM 2", file: "assets/music/%E9%BA%A6%E4%B9%90%E8%BF%AAShop%20-%20%E7%86%8A%E5%A4%A7%E5%BF%AB%E8%B7%91BGM.mp3" }
+    { name: "熊大快跑BGM 2", file: "assets/music/%E9%BA%A6%E4%B9%90%E8%BF%AAShop%20-%20%E7%86%8A%E5%A4%A7%E5%BF%AB%E8%B7%91BGM.mp3" },
+    { name: "静音", file: "" }
   ];
   var bgmIndex = Number(localStorage.getItem("seia-runner-bgm-index") || 0);
   var bgm = new Audio(bgmList[bgmIndex].file);
@@ -73,15 +74,15 @@
   // 页面隐藏时暂停音乐，返回时恢复
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
-      bgm.pause();
-    } else if (state === "playing") {
+      if (bgmList[bgmIndex].file) bgm.pause();
+    } else if (state === "playing" && bgmList[bgmIndex].file) {
       bgm.play().catch(function () {});
     }
   });
 
   // 页面即将离开时暂停音乐
   window.addEventListener("pagehide", function () {
-    bgm.pause();
+    if (bgmList[bgmIndex].file) bgm.pause();
   });
   var deathSound = new Audio("assets/audio/seia-death.wav");
   deathSound.volume = 0.9;
@@ -240,6 +241,9 @@
   }
 
   function playBgm() {
+    if (!bgmList[bgmIndex].file) {
+      return;
+    }
     if (!bgm.paused) {
       return;
     }
@@ -253,12 +257,14 @@
     bgm.pause();
     bgmIndex = (bgmIndex + 1) % bgmList.length;
     localStorage.setItem("seia-runner-bgm-index", String(bgmIndex));
-    bgm = new Audio(bgmList[bgmIndex].file);
-    bgm.loop = true;
-    bgm.volume = 0.5;
     bgmButton.textContent = "BGM: " + bgmList[bgmIndex].name;
-    if (state === "playing") {
-      bgm.play().catch(function () {});
+    if (bgmList[bgmIndex].file) {
+      bgm = new Audio(bgmList[bgmIndex].file);
+      bgm.loop = true;
+      bgm.volume = 0.5;
+      if (state === "playing") {
+        bgm.play().catch(function () {});
+      }
     }
   }
 
