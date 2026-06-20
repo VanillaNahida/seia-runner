@@ -108,6 +108,7 @@ function getDB() {
         message VARCHAR(90) NOT NULL,
         score INT NOT NULL DEFAULT 0,
         ip_addr VARCHAR(45) NOT NULL DEFAULT '',
+        real_ip VARCHAR(45) NOT NULL DEFAULT '',
         device VARCHAR(50) NOT NULL DEFAULT '',
         location VARCHAR(100) NOT NULL DEFAULT '',
         fingerprint VARCHAR(128) NOT NULL DEFAULT '',
@@ -120,6 +121,7 @@ function getDB() {
     // 旧表兼容: 尝试添加缺失的列，升级唯一键为 fingerprint+device
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN fingerprint VARCHAR(128) NOT NULL DEFAULT '' AFTER location"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"); } catch (Exception $e) {}
+    try { $conn->query("ALTER TABLE seia_score_rank ADD COLUMN real_ip VARCHAR(45) NOT NULL DEFAULT '' AFTER ip_addr"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank DROP INDEX uk_fingerprint_ip"); } catch (Exception $e) {}
     try { $conn->query("ALTER TABLE seia_score_rank ADD UNIQUE uk_fingerprint_device (fingerprint, device)"); } catch (Exception $e) {}
 

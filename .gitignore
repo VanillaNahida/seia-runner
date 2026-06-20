@@ -2,3 +2,4 @@
 api/config.php
 api/cheat_code.txt
 sensitive_words.txt
+*.py

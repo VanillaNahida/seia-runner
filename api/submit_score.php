@@ -227,9 +227,9 @@ try {
         if ($score > $oldScore) {
             // 新成绩更高，更新记录
             $stmt = $conn->prepare(
-                "UPDATE seia_score_rank SET nickname = ?, message = ?, score = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, score = ?, device = ?, location = ?, real_ip = ?, updated_at = NOW() WHERE id = ?"
             );
-            $stmt->bind_param("ssissi", $nickname, $message, $score, $device, $location, $oldId);
+            $stmt->bind_param("ssisssi", $nickname, $message, $score, $device, $location, $ip_addr, $oldId);
             $stmt->execute();
             $stmt->close();
 
@@ -248,9 +248,9 @@ try {
         } else {
             // 已有更高记录，仅更新昵称和留言
             $stmt = $conn->prepare(
-                "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, updated_at = NOW() WHERE id = ?"
+                "UPDATE seia_score_rank SET nickname = ?, message = ?, device = ?, location = ?, real_ip = ?, updated_at = NOW() WHERE id = ?"
             );
-            $stmt->bind_param("ssssi", $nickname, $message, $device, $location, $oldId);
+            $stmt->bind_param("sssssi", $nickname, $message, $device, $location, $ip_addr, $oldId);
             $stmt->execute();
             $stmt->close();
 
@@ -270,9 +270,9 @@ try {
     } else {
         // 新记录，插入
         $stmt = $conn->prepare(
-            "INSERT INTO seia_score_rank (nickname, message, score, ip_addr, device, location, fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO seia_score_rank (nickname, message, score, ip_addr, real_ip, device, location, fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("ssissss", $nickname, $message, $score, $ip_addr, $device, $location, $fingerprint);
+        $stmt->bind_param("ssisssss", $nickname, $message, $score, $ip_addr, $ip_addr, $device, $location, $fingerprint);
 
         if ($stmt->execute()) {
             $rankId = $conn->insert_id;
