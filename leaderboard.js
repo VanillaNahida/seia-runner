@@ -1,6 +1,7 @@
 var currentPage = 1;
 var currentType = 'all';
 var currentQuery = '';
+var currentDate = '';
 var currentPageSize = '10';
 var allowedTypes = ['day', 'week', 'month', 'all'];
 var allowedPageSizes = ['10', '20', '50', '100', 'all'];
@@ -66,13 +67,16 @@ function showServerError(html) {
     serverErrorModal.classList.remove("hidden");
 }
 
-function buildPageHref(type, pageSize, page, query) {
+function buildPageHref(type, pageSize, page, query, date) {
     var params = new URLSearchParams();
     params.set('type', normalizeType(type));
     params.set('pageSize', normalizePageSize(pageSize));
     params.set('page', normalizePage(page));
     if (query) {
         params.set('query', query);
+    }
+    if (date) {
+        params.set('date', date);
     }
     return '?' + params.toString();
 }
@@ -82,7 +86,7 @@ function getQueryParam(name) {
     return urlParams.get(name);
 }
 
-function updateURL(type, page, query, pageSize) {
+function updateURL(type, page, query, pageSize, date) {
     var url = new URL(window.location);
     if (type) {
         url.searchParams.set('type', normalizeType(type));
@@ -101,6 +105,11 @@ function updateURL(type, page, query, pageSize) {
         url.searchParams.set('pageSize', safePageSize);
     } else {
         url.searchParams.delete('pageSize');
+    }
+    if (date) {
+        url.searchParams.set('date', date);
+    } else {
+        url.searchParams.delete('date');
     }
     window.history.replaceState({}, '', url);
 }
@@ -187,16 +196,46 @@ function getRankSuffix(rank) {
     return 'th';
 }
 
-function renderTable(data, total, page, pageSize) {
+function renderTable(data, total, page, pageSize, incremental) {
     var tableBody = document.getElementById('rankTableBody');
+    var startRank = (page - 1) * pageSize + 1;
 
     if (data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="rank-loading">暂无数据</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="rank-loading">' + (currentDate ? '所筛选日期没有存在游玩记录' : '暂无数据') + '</td></tr>';
+        return;
+    }
+
+    if (incremental) {
+        tableBody.innerHTML = '';
+        var idx = 0;
+        var chunkSize = 150;
+        function renderChunk() {
+            var html = '';
+            var end = Math.min(idx + chunkSize, data.length);
+            for (; idx < end; idx++) {
+                var item = data[idx];
+                var rank = startRank + idx;
+                var time = item.updated_at ? formatTime(item.updated_at) : formatTime(item.created_at);
+                html += '<tr>' +
+                    '<td class="col-rank">' + rank + getRankSuffix(rank) + '</td>' +
+                    '<td class="col-nick">' + escapeHTML(item.nickname) + '</td>' +
+                    '<td class="col-score">' + escapeHTML(item.score) + '</td>' +
+                    '<td class="col-msg">' + escapeHTML(item.message || '') + '</td>' +
+                    '<td class="col-loc">' + escapeHTML(item.location) + '</td>' +
+                    '<td class="col-dev">' + escapeHTML(item.device) + '</td>' +
+                    '<td class="col-time">' + escapeHTML(time) + '</td>' +
+                    '</tr>';
+            }
+            tableBody.insertAdjacentHTML('beforeend', html);
+            if (idx < data.length) {
+                setTimeout(renderChunk, 0);
+            }
+        }
+        renderChunk();
         return;
     }
 
     var html = '';
-    var startRank = (page - 1) * pageSize + 1;
 
     data.forEach(function(item, index) {
         var rank = startRank + index;
@@ -217,16 +256,48 @@ function renderTable(data, total, page, pageSize) {
     tableBody.innerHTML = html;
 }
 
-function renderCards(data, total, page, pageSize) {
+function renderCards(data, total, page, pageSize, incremental) {
     var rankList = document.getElementById('rankList');
+    var startRank = (page - 1) * pageSize + 1;
 
     if (data.length === 0) {
-        rankList.innerHTML = '<div class="rank-item no-data"><div>暂无数据</div></div>';
+        rankList.innerHTML = '<div class="rank-item no-data"><div>' + (currentDate ? '所筛选日期没有存在游玩记录' : '暂无数据') + '</div></div>';
+        return;
+    }
+
+    if (incremental) {
+        rankList.innerHTML = '';
+        var idx = 0;
+        var chunkSize = 50;
+        function renderChunk() {
+            var html = '';
+            var end = Math.min(idx + chunkSize, data.length);
+            for (; idx < end; idx++) {
+                var item = data[idx];
+                var rank = startRank + idx;
+                var time = item.updated_at ? formatTime(item.updated_at) : formatTime(item.created_at);
+                html += '<div class="rank-item">' +
+                    '<div class="rank-item-header">' +
+                    '<span class="rank-name">' + rank + getRankSuffix(rank) + ' ' + escapeHTML(item.nickname) + '</span>' +
+                    '<span class="rank-time">' + escapeHTML(time) + '</span>' +
+                    '</div>' +
+                    '<div class="rank-item-body">' +
+                    '<div class="rank-score">SCORE: <strong>' + escapeHTML(item.score) + '</strong></div>' +
+                    '<div class="rank-info">' + escapeHTML(item.device) + ' - ' + escapeHTML(item.location) + '</div>' +
+                    (item.message ? '<div class="rank-message">' + escapeHTML(item.message) + '</div>' : '') +
+                    '</div>' +
+                    '</div>';
+            }
+            rankList.insertAdjacentHTML('beforeend', html);
+            if (idx < data.length) {
+                setTimeout(renderChunk, 0);
+            }
+        }
+        renderChunk();
         return;
     }
 
     var html = '';
-    var startRank = (page - 1) * pageSize + 1;
 
     data.forEach(function(item, index) {
         var rank = startRank + index;
@@ -263,7 +334,7 @@ function renderPagination(total, pageSize, currentPage) {
     var html = '<ul class="pagination">';
 
     if (currentPage > 1) {
-        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage - 1, currentQuery) + '">&laquo;</a></li>';
+        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage - 1, currentQuery, currentDate) + '">&laquo;</a></li>';
     } else {
         html += '<li class="disabled"><a href="#">&laquo;</a></li>';
     }
@@ -297,14 +368,14 @@ function renderPagination(total, pageSize, currentPage) {
         if (p === "...") {
             html += '<li class="disabled"><a href="#">&hellip;</a></li>';
         } else if (p === currentPage) {
-            html += '<li class="active"><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery) + '">' + p + '</a></li>';
+            html += '<li class="active"><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery, currentDate) + '">' + p + '</a></li>';
         } else {
-            html += '<li><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery) + '">' + p + '</a></li>';
+            html += '<li><a href="' + buildPageHref(safeType, safePageSize, p, currentQuery, currentDate) + '">' + p + '</a></li>';
         }
     }
 
     if (currentPage < totalPages) {
-        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage + 1, currentQuery) + '">&raquo;</a></li>';
+        html += '<li><a href="' + buildPageHref(safeType, safePageSize, currentPage + 1, currentQuery, currentDate) + '">&raquo;</a></li>';
     } else {
         html += '<li class="disabled"><a href="#">&raquo;</a></li>';
     }
@@ -313,12 +384,13 @@ function renderPagination(total, pageSize, currentPage) {
     pagination.innerHTML = html;
 }
 
-function loadData(type, page, pageSize, query) {
+function loadData(type, page, pageSize, query, date) {
     var url = 'api/get_scores.php';
     var params = [];
     var safeType = normalizeType(type || currentType);
     var safePage = normalizePage(page || currentPage);
     var safePageSize = normalizePageSize(pageSize || currentPageSize);
+    var safeDate = date || currentDate;
 
     if (safeType) {
         params.push('type=' + encodeURIComponent(safeType));
@@ -332,6 +404,9 @@ function loadData(type, page, pageSize, query) {
     if (query) {
         params.push('query=' + encodeURIComponent(query));
     }
+    if (safeDate) {
+        params.push('date=' + encodeURIComponent(safeDate));
+    }
 
     if (params.length > 0) {
         url += '?' + params.join('&');
@@ -344,6 +419,7 @@ function loadData(type, page, pageSize, query) {
                 currentType = safeType;
                 currentPage = safePage;
                 currentQuery = query || '';
+                currentDate = safeDate;
                 currentPageSize = safePageSize;
                 currentTotal = data.total;
                 currentDataPageSize = data.pageSize;
@@ -361,8 +437,9 @@ function loadData(type, page, pageSize, query) {
                     sortDataArray(allData, sortState.column, sortState.asc);
                 }
 
-                renderTable(allData, data.total, data.page, data.pageSize);
-                renderCards(allData, data.total, data.page, data.pageSize);
+                var isAllMode = safePageSize === 'all';
+                renderTable(allData, data.total, data.page, data.pageSize, isAllMode);
+                renderCards(allData, data.total, data.page, data.pageSize, isAllMode);
                 renderPagination(data.total, data.pageSize, data.page);
                 updateNavActive();
                 updateSortIndicators();
@@ -397,11 +474,13 @@ function init() {
     var type = normalizeType(getQueryParam('type') || 'day');
     var page = normalizePage(getQueryParam('page') || 1);
     var query = getQueryParam('query') || '';
+    var date = getQueryParam('date') || '';
     var pageSize = normalizePageSize(getQueryParam('pageSize') || '10');
 
     currentType = type;
     currentPage = page;
     currentQuery = query;
+    currentDate = date;
     currentPageSize = pageSize;
 
     if (query) {
@@ -409,6 +488,9 @@ function init() {
     }
 
     document.getElementById('pageSizeSelect').value = pageSize;
+    if (date) {
+        document.getElementById('datePicker').value = date;
+    }
 
     var navToggle = document.querySelector('.nav-toggle');
     var navMenu = document.querySelector('.nav-menu');
@@ -417,17 +499,29 @@ function init() {
         navMenu.classList.toggle('active');
     });
 
+    // 导航栏点击时保留 date 参数
+    document.querySelectorAll('.nav-menu .nav-item[href^="?type="]').forEach(function(a) {
+        a.addEventListener('click', function(e) {
+            if (currentDate) {
+                e.preventDefault();
+                var url = new URL(a.href, window.location.origin);
+                url.searchParams.set('date', currentDate);
+                window.location.href = url.toString();
+            }
+        });
+    });
+
     var searchBtn = document.getElementById('searchBtn');
     var searchInput = document.getElementById('searchInput');
 
     searchBtn.addEventListener('click', function() {
         var q = searchInput.value.trim();
         if (q) {
-            loadData(null, 1, currentPageSize, q);
-            updateURL(null, 1, q, currentPageSize);
+            loadData(null, 1, currentPageSize, q, currentDate);
+            updateURL(null, 1, q, currentPageSize, currentDate);
         } else {
-            loadData(currentType, 1, currentPageSize, '');
-            updateURL(currentType, 1, '', currentPageSize);
+            loadData(currentType, 1, currentPageSize, '', currentDate);
+            updateURL(currentType, 1, '', currentPageSize, currentDate);
         }
     });
 
@@ -442,11 +536,24 @@ function init() {
         var newSize = pageSizeSelect.value;
         currentPageSize = newSize;
         if (currentQuery) {
-            loadData(null, 1, newSize, currentQuery);
-            updateURL(null, 1, currentQuery, newSize);
+            loadData(null, 1, newSize, currentQuery, currentDate);
+            updateURL(null, 1, currentQuery, newSize, currentDate);
         } else {
-            loadData(currentType, 1, newSize, '');
-            updateURL(currentType, 1, '', newSize);
+            loadData(currentType, 1, newSize, '', currentDate);
+            updateURL(currentType, 1, '', newSize, currentDate);
+        }
+    });
+
+    var datePicker = document.getElementById('datePicker');
+    datePicker.addEventListener('change', function() {
+        var d = datePicker.value;
+        currentDate = d;
+        if (currentQuery) {
+            loadData(null, 1, currentPageSize, currentQuery, d);
+            updateURL(null, 1, currentQuery, currentPageSize, d);
+        } else {
+            loadData(currentType, 1, currentPageSize, '', d);
+            updateURL(currentType, 1, '', currentPageSize, d);
         }
     });
 
@@ -463,8 +570,8 @@ function init() {
         }
         sortDataArray(allData, sortState.column, sortState.asc);
         var pageSize = currentDataPageSize;
-        renderTable(allData, currentTotal, currentPage, pageSize);
-        renderCards(allData, currentTotal, currentPage, pageSize);
+        renderTable(allData, currentTotal, currentPage, pageSize, currentPageSize === 'all');
+        renderCards(allData, currentTotal, currentPage, pageSize, currentPageSize === 'all');
         updateSortIndicators();
     });
     
@@ -484,7 +591,7 @@ function init() {
         }
     });
 
-    loadData(type, page, pageSize, query);
+    loadData(type, page, pageSize, query, date);
 }
 
 document.addEventListener('DOMContentLoaded', init);

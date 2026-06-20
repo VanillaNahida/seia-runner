@@ -25,8 +25,8 @@ function isValidScoreString($score) {
         return false;
     }
     
-    // 最大分数为99999999
-    $max = "99999999";
+    // 最大分数为2147483647
+    $max = "2147483647";
     return strlen($normalized) < strlen($max)
         || (strlen($normalized) === strlen($max) && strcmp($normalized, $max) <= 0);
 }
@@ -211,18 +211,13 @@ if (!hash_equals($expected, $checksum)) {
 $geetestLib = new GeetestLib(GEETEST_ID, GEETEST_KEY);
 $geetestResult = $geetestLib->validate($lotNumber, $captchaOutput, $passToken, $genTime);
 
-// 如果在线验证失败，回退到本地校验
+// 不使用降级验证，防止绕过攻击
 if ($geetestResult->getStatus() !== 1) {
-    error_log("[Geetest] 二次验证: 在线验证失败，回退到本地校验 | captcha_id=" . GEETEST_ID . " | msg=" . $geetestResult->getMsg());
-    $geetestResult = $geetestLib->failValidate($lotNumber, $captchaOutput, $passToken, $genTime);
-} else {
-    error_log("[Geetest] 二次验证: 在线验证通过 | captcha_id=" . GEETEST_ID);
-}
-
-if ($geetestResult->getStatus() !== 1) {
+    error_log("[Geetest] 二次验证: 验证失败 | captcha_id=" . GEETEST_ID . " | msg=" . $geetestResult->getMsg());
     echo json_encode(["code" => 403, "message" => "验证码验证失败，请重新提交"]);
     exit;
 }
+error_log("[Geetest] 二次验证: 验证通过 | captcha_id=" . GEETEST_ID);
 
 enforceScoreRateLimit($fingerprint, $ip_addr);
 

@@ -13,6 +13,7 @@ try {
 $type = isset($_GET['type']) ? $_GET['type'] : 'all';
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
 $query = isset($_GET['query']) ? trim($_GET['query']) : '';
+$date = isset($_GET['date']) ? trim($_GET['date']) : '';
 
 $rawPageSize = isset($_GET['pageSize']) ? $_GET['pageSize'] : '10';
 if ($rawPageSize === 'all') {
@@ -25,35 +26,44 @@ if ($rawPageSize === 'all') {
     }
 }
 
-$cond = "";
-$params = [];
+// 构建 WHERE 子句
+// 注意：date 参数经过正则验证后直接拼入 SQL，避免 bind_param 引用传递的兼容性问题
+// query 参数继续使用 prepared statement 防止 SQL 注入
+$whereClauses = [];
+$bindParams = [];
+$bindTypes = '';
 
 if ($query !== '') {
-    $cond = "WHERE nickname LIKE ?";
-    $params[] = '%' . $query . '%';
-} else {
+    $whereClauses[] = "nickname LIKE ?";
+    $bindParams[] = '%' . $query . '%';
+    $bindTypes .= 's';
+}
+
+if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+    $whereClauses[] = "DATE(updated_at) = '$date'";
+}
+
+if ($query === '' && $date === '') {
     switch ($type) {
         case 'day':
-            $cond = "WHERE DATE(created_at) = CURDATE()";
+            $whereClauses[] = "DATE(created_at) = CURDATE()";
             break;
         case 'week':
-            $cond = "WHERE DATE_SUB(CURDATE(), INTERVAL 7 DAY) <= created_at";
+            $whereClauses[] = "DATE_SUB(CURDATE(), INTERVAL 7 DAY) <= created_at";
             break;
         case 'month':
-            $cond = "WHERE DATE_SUB(CURDATE(), INTERVAL 30 DAY) <= created_at";
-            break;
-        case 'all':
-        default:
-            $cond = "";
+            $whereClauses[] = "DATE_SUB(CURDATE(), INTERVAL 30 DAY) <= created_at";
             break;
     }
 }
 
-$countSql = "SELECT COUNT(*) as total FROM seia_score_rank " . ($cond ? $cond : '');
+$cond = $whereClauses ? "WHERE " . implode(" AND ", $whereClauses) : "";
+
+$countSql = "SELECT COUNT(*) as total FROM seia_score_rank " . $cond;
 try {
     $countStmt = $conn->prepare($countSql);
-    if ($query !== '') {
-        $countStmt->bind_param("s", $params[0]);
+    if ($bindParams) {
+        $countStmt->bind_param($bindTypes, ...$bindParams);
     }
     $countStmt->execute();
     $countResult = $countStmt->get_result();
@@ -62,17 +72,17 @@ try {
     $countStmt->close();
 
     if ($pageSize === 0) {
-        $sql = "SELECT id, nickname, message, score, ip_addr, device, location, created_at, updated_at FROM seia_score_rank " . ($cond ? $cond : '') . " ORDER BY score DESC, created_at ASC";
+        $sql = "SELECT id, nickname, message, score, ip_addr, device, location, created_at, updated_at FROM seia_score_rank " . $cond . " ORDER BY score DESC, created_at ASC";
         $stmt = $conn->prepare($sql);
-        if ($query !== '') {
-            $stmt->bind_param("s", $params[0]);
+        if ($bindParams) {
+            $stmt->bind_param($bindTypes, ...$bindParams);
         }
     } else {
         $offset = ($page - 1) * $pageSize;
-        $sql = "SELECT id, nickname, message, score, ip_addr, device, location, created_at, updated_at FROM seia_score_rank " . ($cond ? $cond : '') . " ORDER BY score DESC, created_at ASC LIMIT ?, ?";
+        $sql = "SELECT id, nickname, message, score, ip_addr, device, location, created_at, updated_at FROM seia_score_rank " . $cond . " ORDER BY score DESC, created_at ASC LIMIT ?, ?";
         $stmt = $conn->prepare($sql);
-        if ($query !== '') {
-            $stmt->bind_param("sii", $params[0], $offset, $pageSize);
+        if ($bindParams) {
+            $stmt->bind_param($bindTypes . "ii", ...array_merge($bindParams, [$offset, $pageSize]));
         } else {
             $stmt->bind_param("ii", $offset, $pageSize);
         }
