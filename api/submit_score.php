@@ -79,22 +79,15 @@ function firstValidClientIp($value) {
 }
 
 function resolveClientIp() {
-    $singleIpHeaders = [
-        "HTTP_CF_CONNECTING_IP",
-        "HTTP_TRUE_CLIENT_IP",
-        "HTTP_X_REAL_IP",
-        "HTTP_X_CLIENT_IP"
-    ];
-
-    foreach ($singleIpHeaders as $header) {
-        if (!empty($_SERVER[$header])) {
-            $ip = normalizeClientIp($_SERVER[$header]);
-            if ($ip !== "") {
-                return $ip;
-            }
+    // 优先使用 EO CDN 提供的真实 IP
+    if (!empty($_SERVER["HTTP_EO_CONNECTING_IP"])) {
+        $ip = normalizeClientIp($_SERVER["HTTP_EO_CONNECTING_IP"]);
+        if ($ip !== "") {
+            return $ip;
         }
     }
 
+    // X-Forwarded-For 取第一个（EO CDN 会将真实 IP 放在最前面）
     if (!empty($_SERVER["HTTP_X_FORWARDED_FOR"])) {
         $ip = firstValidClientIp($_SERVER["HTTP_X_FORWARDED_FOR"]);
         if ($ip !== "") {
@@ -102,8 +95,9 @@ function resolveClientIp() {
         }
     }
 
-    if (!empty($_POST["ip_addr"])) {
-        $ip = normalizeClientIp($_POST["ip_addr"]);
+    // EO 控制台需开启客户端 IP 获取
+    if (!empty($_SERVER["HTTP_EO_CLIENT_IP"])) {
+        $ip = normalizeClientIp($_SERVER["HTTP_EO_CLIENT_IP"]);
         if ($ip !== "") {
             return $ip;
         }
