@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
+
 require_once __DIR__ . "/init.php";
 require_once __DIR__ . "/captcha/geetest_config.php";
 require_once __DIR__ . "/captcha/geetest_lib.php";
@@ -172,17 +174,26 @@ if ($device === "") {
     exit;
 }
 
-// 敏感词检测
-$badWord = checkSensitiveWords($nickname);
-if ($badWord !== false) {
-    echo json_encode(["code" => 400, "message" => "昵称包含敏感词，请换一个昵称再试"]);
-    exit;
-}
+// 百度内容审核（逐个检测）
+require_once __DIR__ . "/content_censor.php";
 
-if ($message !== "") {
-    $badWord = checkSensitiveWords($message);
-    if ($badWord !== false) {
-        echo json_encode(["code" => 400, "message" => "留言包含敏感词，请换一个留言再试"]);
+$censorFields = [
+    ["value" => $nickname, "label" => "昵称"],
+    ["value" => $message,  "label" => "留言"],
+    ["value" => $location, "label" => "位置"],
+    ["value" => $device,   "label" => "设备信息"],
+];
+
+foreach ($censorFields as $field) {
+    if ($field["value"] === "") {
+        continue;
+    }
+    $result = baiduTextCensor($field["value"], $field["label"]);
+    if ($result["pass"] === false) {
+        echo json_encode([
+            "code" => 400,
+            "message" => "您的输入存在敏感词，成绩提交已被拒绝！\n位置：" . $result["field"] . "\n违规内容原文：" . $result["hit"] . "\n违规理由：" . $result["reason"]
+        ]);
         exit;
     }
 }

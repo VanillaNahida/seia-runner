@@ -124,6 +124,18 @@
         <iframe id="serverErrorFrame" class="server-error-frame" sandbox="allow-same-origin"></iframe>
       </div>
     </div>
+
+    <div id="censorModal" class="censor-modal hidden">
+      <div class="censor-dialog">
+        <div class="censor-header">
+          <h2>提交被拒绝！</h2>
+          <button id="censorClose" type="button" class="censor-close-btn">X</button>
+        </div>
+        <div class="censor-body">
+          <p id="censorMessage" class="censor-message"></p>
+        </div>
+      </div>
+    </div>
   </div>
 </body>
 </html>

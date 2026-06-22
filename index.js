@@ -1185,6 +1185,25 @@
     serverErrorModal.classList.remove("hidden");
   }
 
+  var censorModal = document.getElementById("censorModal");
+  var censorMessage = document.getElementById("censorMessage");
+  var censorClose = document.getElementById("censorClose");
+
+  censorClose.addEventListener("click", function () {
+    censorModal.classList.add("hidden");
+  });
+
+  censorModal.addEventListener("click", function (e) {
+    if (e.target === censorModal) {
+      censorModal.classList.add("hidden");
+    }
+  });
+
+  function showCensorModal(msg) {
+    censorMessage.textContent = msg;
+    censorModal.classList.remove("hidden");
+  }
+
   function parseResponse(res) {
     if (res.status === 403) {
       var contentType = res.headers.get("Content-Type") || "";
@@ -1318,8 +1337,14 @@
             showToast("上传成功！当前排名第 " + data.data.rank + " 名");
           }
         } else {
-          submitError.textContent = "提交成绩失败：" + (data.message || "未知错误");
-          submitError.classList.remove("hidden");
+          if (data.message && data.message.indexOf("您的输入存在敏感词") !== -1) {
+            submitConfirm.disabled = false;
+            submitConfirm.textContent = "提交";
+            showCensorModal(data.message);
+          } else {
+            submitError.textContent = "提交成绩失败：" + (data.message || "未知错误");
+            submitError.classList.remove("hidden");
+          }
         }
       })
       .catch(function (err) {
